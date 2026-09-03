@@ -1,5 +1,5 @@
 import { createResource, For, Show } from "solid-js";
-import { loaded, loadBytes, loadExample, goBack, history, showTree, showInspector, toggleTree, toggleInspector } from "./state";
+import { loaded, loadBytes, loadExample, goBack, history, showTree, showInspector, toggleTree, toggleInspector, problems, scan } from "./state";
 import { bytesLabel } from "./format";
 
 interface ExampleMeta {
@@ -71,8 +71,8 @@ export function TopBar() {
             <span class="stat">{L().layout.sorts.length} sorts</span>
             <span class="stat">{L().layout.terms.length} terms</span>
             <span class="stat">{L().layout.thms.length} thms</span>
-            <span class="stat muted">parsed in {L().parseMs.toFixed(0)} ms</span>
-            <Show when={L().layout.problems.filter((p) => p.severity === "error").length}>
+            <span class="stat muted">parsed in {L().parseMs.toFixed(0)} ms{scan() ? `, scanned in ${scan()!.ms.toFixed(0)} ms` : ""}</span>
+            <Show when={problems().filter((p) => p.severity === "error").length}>
               {(n) => <span class="stat bad">{n()} problem{n() === 1 ? "" : "s"}</span>}
             </Show>
           </div>

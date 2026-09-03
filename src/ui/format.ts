@@ -71,6 +71,7 @@ export function describeValue(s: Span, L: Layout): ValueLine[] {
   const out: ValueLine[] = [];
   const fam = family(s.kind);
   switch (s.kind) {
+    // Bit-packed kinds: the bit view shows the fields; only the raw value goes here.
     case "sorts.entry": {
       const m = v as Record<string, boolean>;
       const raw = L.sorts[s.owner!.id]?.raw ?? 0;
@@ -78,22 +79,12 @@ export function describeValue(s: Span, L: Layout): ValueLine[] {
       out.push({ key: "modifiers", value: SORT_MODIFIERS.filter((k) => m[k]).join(" ") || "(none)" });
       break;
     }
-    case "terms.ret_sort": {
-      const r = v as { sort: number; isDef: boolean };
-      out.push({ key: "sort", value: `${r.sort} (${declName(L, { kind: "sort", id: r.sort })})`, link: L.sorts[r.sort]?.span.start });
-      out.push({ key: "is_def", value: r.isDef ? "1 (def)" : "0 (term)" });
+    case "terms.ret_sort":
       break;
-    }
     case "termdata.arg":
     case "termdata.ret":
     case "thmdata.arg": {
-      const a = v as { deps: bigint; reservedBit: boolean; sort: number; bound: boolean };
-      const raw = L.bytes.u64(s.start);
-      out.push({ key: "u64", value: hex(raw, 16), mono: true });
-      out.push({ key: "bound", value: a.bound ? "1 (bound variable)" : "0" });
-      out.push({ key: "sort", value: `${a.sort} (${declName(L, { kind: "sort", id: a.sort })})`, link: L.sorts[a.sort]?.span.start });
-      if (a.reservedBit) out.push({ key: "reserved bit 55", value: "SET (invalid)" });
-      out.push({ key: "deps", value: depsLabel(a.deps, s, L), mono: true });
+      out.push({ key: "u64", value: hex(L.bytes.u64(s.start), 16), mono: true });
       break;
     }
     case "unify.cmd":
@@ -104,8 +95,7 @@ export function describeValue(s: Span, L: Layout): ValueLine[] {
       const first = L.bytes.u8(c.offset);
       const table = s.kind === "unify.cmd" ? UNIFY_OPS : s.kind === "proof.cmd" || s.kind === "proof.end" ? PROOF_OPS : undefined;
       const name = table ? table[c.op]?.name : STATEMENTS[c.op]?.name ?? (c.op === 0 ? "END" : undefined);
-      out.push({ key: "first byte", value: `${hex(first, 2)} = ${(first >> 6).toString(2).padStart(2, "0")} | ${(first & 0x3f).toString(2).padStart(6, "0")}b`, mono: true });
-      out.push({ key: "length tag", value: `${first >> 6} → ${c.dataBytes} data byte${c.dataBytes === 1 ? "" : "s"}` });
+      out.push({ key: "encoding", value: `${c.size} byte${c.size === 1 ? "" : "s"}: opcode ${hex(first & 0x3f, 2)}${c.dataBytes ? ` + ${c.dataBytes}-byte data` : ", no data"}`, mono: true });
       out.push({ key: "opcode", value: `${hex(c.op, 2)} ${name ?? "(unknown)"}`, mono: true });
       if (c.dataBytes > 0) out.push({ key: "data", value: `${c.data} (${hex(c.data)})`, mono: true, link: s.target });
       if (s.kind === "proof.stmt_cmd") out.push({ key: "next statement", value: hex(c.offset + c.data), link: c.offset + c.data, mono: true });
@@ -132,7 +122,8 @@ export function describeValue(s: Span, L: Layout): ValueLine[] {
   return out;
 }
 
-function depsLabel(deps: bigint, s: Span, L: Layout): string {
+/** Dependency bitmap as the names of the owner's bound variables. */
+export function depsLabel(deps: bigint, s: Span, L: Layout): string {
   if (deps === 0n) return "0 (no dependencies)";
   const bits: number[] = [];
   for (let i = 0; i < 55; i++) if ((deps >> BigInt(i)) & 1n) bits.push(i);

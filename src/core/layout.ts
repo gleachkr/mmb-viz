@@ -110,6 +110,19 @@ export interface Statement {
   bodyStart: number;
   bodyEnd: number;
   span: Span;
+  /**
+   * How many sorts, terms, and theorems a reference inside this statement
+   * may use: everything declared strictly before it. mm0-c increments its
+   * counters only after a statement verifies, so a def or theorem cannot
+   * refer to itself.
+   */
+  avail: Avail;
+}
+
+export interface Avail {
+  sorts: number;
+  terms: number;
+  thms: number;
 }
 
 export interface IndexEntry {
@@ -608,13 +621,59 @@ class Parser {
       kind: "unify",
       label: `unify stream: ${this.nameOf(owner)}`,
       owner,
-      children: () => this.decodeCmds(start, end, "unify.cmd", owner, UNIFY_OPS, "unify"),
+      children: () => this.checkUnifyShape(this.decodeCmds(start, end, "unify.cmd", owner, UNIFY_OPS, this.availFor(owner)), owner),
     };
     return { start, end, span, problem };
   }
 
+  /**
+   * The shape of a unify stream is fixed by the arities of its terms: it is
+   * one expression in polish notation, and for theorems each UHyp is
+   * followed by one more. Count the expressions still owed and report a
+   * stream that ends too early or goes on too long.
+   */
+  checkUnifyShape(cmds: Span[], owner: DeclRef): Span[] {
+    let owed = 1;
+    for (const span of cmds) {
+      if (span.kind !== "unify.cmd") break;
+      const cmd = span.value as Cmd;
+      if (cmd.op === 0) {
+        if (owed > 0) addProblem(span, { offset: span.start, message: `unify stream ends while ${owed} subexpression${owed === 1 ? " is" : "s are"} still expected (END came too early)`, severity: "error" });
+        break;
+      }
+      if (owed === 0 && cmd.op !== 0x36) {
+        addProblem(span, { offset: span.start, message: "the expression is complete but the stream continues (END came too late)", severity: "error" });
+        break;
+      }
+      switch (cmd.op) {
+        case 0x30:
+        case 0x31:
+          owed += (this.layout.terms[cmd.data]?.numArgs ?? 0) - 1;
+          break;
+        case 0x32:
+        case 0x33:
+          owed -= 1;
+          break;
+        case 0x36:
+          if (owner.kind === "term") addProblem(span, { offset: span.start, message: "UHyp is only allowed in the unify stream of an axiom or theorem", severity: "error" });
+          else if (owed > 0) addProblem(span, { offset: span.start, message: `UHyp arrives while ${owed} subexpression${owed === 1 ? " is" : "s are"} still expected`, severity: "error" });
+          owed += 1;
+          break;
+      }
+      if (cmd.op === 0x33 && owner.kind === "thm") addProblem(span, { offset: span.start, message: "UDummy is only allowed in the unify stream of a def", severity: "error" });
+    }
+    return cmds;
+  }
+
   /** Decode a run of (cmd, data) pairs into leaf spans. */
-  decodeCmds(start: number, end: number, kind: SpanKind, owner: DeclRef | undefined, ops: Record<number, { name: string; arg: string }>, _ctx: string): Span[] {
+  /** Declarations visible from inside a term or theorem's own streams. */
+  availFor(owner: DeclRef | undefined): Avail | undefined {
+    if (!owner) return undefined;
+    const d = owner.kind === "term" ? this.layout.terms[owner.id] : owner.kind === "thm" ? this.layout.thms[owner.id] : undefined;
+    return d?.statement?.avail;
+  }
+
+  decodeCmds(start: number, end: number, kind: SpanKind, owner: DeclRef | undefined, ops: Record<number, { name: string; arg: string }>, avail: Avail | undefined): Span[] {
     const out: Span[] = [];
     let pos = start;
     while (pos < end) {
@@ -630,9 +689,10 @@ class Parser {
       const label = info ? this.cmdLabel(info, cmd) : `unknown opcode ${hex(cmd.op)}`;
       const span: Span = { start: pos, end: pos + cmd.size, kind, label, value: cmd, owner };
       if (!info) addProblem(span, { offset: pos, message: `unknown opcode ${hex(cmd.op)}`, severity: "error" });
-      if (info && info.arg === "term") span.target = this.layout.terms[cmd.data]?.entrySpan.start;
-      if (info && info.arg === "thm") span.target = this.layout.thms[cmd.data]?.entrySpan.start;
-      if (info && info.arg === "sort") span.target = this.layout.sorts[cmd.data]?.span.start;
+      if (info && info.arg === "term") span.target = this.layout.terms[cmd.data]?.entrySpan?.start;
+      if (info && info.arg === "thm") span.target = this.layout.thms[cmd.data]?.entrySpan?.start;
+      if (info && info.arg === "sort") span.target = this.layout.sorts[cmd.data]?.span?.start;
+      if (info) this.checkReference(span, info.arg, cmd, avail);
       out.push(span);
       pos += cmd.size;
       if (cmd.op === 0) break;
@@ -641,6 +701,35 @@ class Parser {
       out.push({ start: pos, end, kind: "unaccounted", label: "bytes after END", owner });
     }
     return out;
+  }
+
+  /**
+   * A command's operand must name a declaration that exists and was
+   * declared before the statement being read (no forward references, and no
+   * self-reference). Heap indices are checked by the verifier, not here.
+   */
+  checkReference(span: Span, arg: string, cmd: Cmd, avail: Avail | undefined): void {
+    const h = this.layout.header;
+    if (!h) return;
+    const total = arg === "term" ? h.numTerms : arg === "thm" ? h.numThms : arg === "sort" ? h.numSorts : -1;
+    if (total < 0) return;
+    const what = arg === "thm" ? "theorem" : arg;
+    if (cmd.data >= total) {
+      addProblem(span, { offset: span.start, message: `${what} ${cmd.data} does not exist (the table has ${total})`, severity: "error" });
+      return;
+    }
+    if (!avail) return;
+    const limit = arg === "term" ? avail.terms : arg === "thm" ? avail.thms : avail.sorts;
+    if (cmd.data >= limit) {
+      const self = cmd.data === limit && span.owner?.kind === arg && span.owner.id === cmd.data;
+      addProblem(span, {
+        offset: span.start,
+        message: self
+          ? `${what} ${cmd.data} refers to itself; only declarations before this statement may be used`
+          : `forward reference: ${what} ${cmd.data} is declared after this statement (only ${limit} ${what}s are available here)`,
+        severity: "error",
+      });
+    }
   }
 
   cmdLabel(info: { name: string; arg: string }, cmd: Cmd): string {
@@ -698,7 +787,10 @@ class Parser {
         stmtSpan.end = Math.max(pos + cmd.size, Math.min(stmtEnd, this.b.length));
       }
 
-      // Assign the declaration this statement introduces.
+      // Assign the declaration this statement introduces. References inside
+      // it may only use what was declared before (mm0-c counts a statement
+      // only after verifying it).
+      const avail: Avail = { sorts: counters.sort, terms: counters.term, thms: counters.thm };
       const decl: DeclRef =
         info.decl === "sort"
           ? { kind: "sort", id: counters.sort++ }
@@ -729,7 +821,7 @@ class Parser {
           kind: "proof.body",
           label: hasProof ? `proof: ${name}` : `unexpected body of ${stmtName} ${decl.id}`,
           owner: decl,
-          children: () => this.decodeProofBody(bodyStart, bodyEnd, decl),
+          children: () => this.decodeProofBody(bodyStart, bodyEnd, decl, avail),
         };
         if (!hasProof) this.problem(bodyStart, `${stmtName} statement ${decl.id} has a ${bodyEnd - bodyStart}-byte body but should have none`, "error", body);
         kids.push(body);
@@ -749,6 +841,7 @@ class Parser {
         bodyStart,
         bodyEnd,
         span: stmtSpan,
+        avail,
       };
       this.layout.statements.push(stmt);
       if (stmtSpan.end <= pos) break;
@@ -762,8 +855,8 @@ class Parser {
     this.layout.proofEnd = end;
   }
 
-  decodeProofBody(start: number, end: number, owner: DeclRef): Span[] {
-    const out = this.decodeCmds(start, end, "proof.cmd", owner, PROOF_OPS, "proof");
+  decodeProofBody(start: number, end: number, owner: DeclRef, avail: Avail): Span[] {
+    const out = this.decodeCmds(start, end, "proof.cmd", owner, PROOF_OPS, avail);
     const last = out[out.length - 1];
     if (!last || last.kind === "unaccounted" || (last.value as Cmd | undefined)?.op !== 0) {
       const target = last ?? out[0];

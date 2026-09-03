@@ -80,3 +80,78 @@ export const EXPLAIN: Record<SpanKind, Explanation> = {
   padding: { title: "Padding", text: "Zero bytes inserted so that the following structure is 8-byte aligned, or the 4 bytes of read-ahead slack after the final END." },
   unaccounted: { title: "Unaccounted bytes", text: "Bytes that no structure references. A well-formed file produced by mm0-rs has none; their presence suggests a bad pointer or truncation elsewhere." },
 };
+
+/** Explanation of one opcode or statement kind, with the spec's stack rule. */
+export interface OpExplanation {
+  title: string;
+  /** The rule in the spec's `H; S, e --> H; S'` notation, when there is one. */
+  rule?: string;
+  text: string;
+  /** Section title in spec/mmb.md and the `data-rule` / `data-row` anchor inside it. */
+  spec: string;
+  anchor?: string;
+}
+
+export const PROOF_OP_EXPLAIN: Record<number, OpExplanation> = {
+  0x00: { title: "END", text: "Ends the proof body. For a def the stack must hold exactly the value; for an axiom the conclusion expression; for a theorem a proof of the conclusion. The statement's length field must point just past this byte.", spec: "Proof Stream", anchor: "END" },
+  0x10: {
+    title: "Term t",
+    rule: "H; S, e1, ..., en --> H; S, (t e1 ... en)",
+    text: "Pops the n = num_args arguments of term t (e1 is deepest) and pushes the application (t e1 ... en). Each argument must have the sort of the corresponding binder, and arguments to bound binders must themselves be bound variables. The result gets the term's return sort. The new node is distinct from any existing node: only Save and Ref create sharing.",
+    spec: "Proof Checking",
+    anchor: "Term",
+  },
+  0x11: { title: "TermSave t", rule: "H; S, e1, ..., en --> H, (t e1 ... en); S, (t e1 ... en)", text: "Term t followed by Save: builds the application and also appends it to the heap, so later Ref commands can reuse the very same node.", spec: "Proof Checking", anchor: "TermSave" },
+  0x12: {
+    title: "Ref i",
+    rule: "H; S --> H; S, H[i]   (or, if H[i] is a conversion e1 = e2: H; S, e1 =?= e2 --> H; S)",
+    text: "Copies heap entry i onto the stack. Heap indices below num_args are the declaration's variables; the rest were appended, in order, by TermSave, ThmSave, Dummy, Save, ConvSave, and Hyp. If the entry is a saved conversion, Ref instead discharges a matching conversion obligation on top of the stack.",
+    spec: "Proof Checking",
+    anchor: "Ref",
+  },
+  0x13: { title: "Dummy s", rule: "H; S --> H, x; S, x", text: "Allocates a fresh bound variable x of sort s, pushes it on both the stack and the heap, and increments next_bv. The sort must not be strict. Dummies are the variables that appear in the proof but not in the statement.", spec: "Proof Checking", anchor: "Dummy" },
+  0x14: {
+    title: "Thm T",
+    rule: "H; S, e1, ..., en, e --> H; S', |- e   where Unify(T): S; e1, ..., en; e --> S'; H'; .",
+    text: "Applies axiom or theorem T. Pops the claimed conclusion e and the n = num_args substitution expressions, checks their sorts and the bound-variable disjointness conditions, then runs T's unify stream to check that e is T's conclusion under the substitution. Each UHyp in the stream pops a proof of the corresponding instantiated hypothesis from the main stack. Pushes |- e. Only valid in axiom and theorem proofs.",
+    spec: "Proof Checking",
+    anchor: "Thm",
+  },
+  0x15: { title: "ThmSave T", rule: "as Thm T, then Save", text: "Thm T followed by Save: the resulting proof |- e is also appended to the heap.", spec: "Proof Checking", anchor: "ThmSave" },
+  0x16: { title: "Hyp", rule: "HS; H; S, e --> HS, e; H, |- e; S", text: "Pops the expression e just constructed, records it as the next hypothesis of the theorem being proved, and appends the proof |- e to the heap so the rest of the proof can cite it with Ref. The sort of e must be provable. Only valid in axiom and theorem proofs.", spec: "Proof Checking", anchor: "Hyp" },
+  0x17: { title: "Conv", rule: "S, e1, |- e2 --> S, |- e1, e1 =?= e2", text: "Conversion: to prove e1 from a proof of e2, push |- e1 and leave the obligation e1 =?= e2 to be discharged by the conversion commands that follow.", spec: "Proof Checking", anchor: "Conv" },
+  0x18: { title: "Refl", rule: "S, e =?= e --> S", text: "Discharges an obligation whose two sides are the same node. This is pointer equality: two structurally equal expressions built separately do not count.", spec: "Proof Checking", anchor: "Refl" },
+  0x19: { title: "Sym", rule: "S, e1 =?= e2 --> S, e2 =?= e1", text: "Swaps the sides of the obligation on top of the stack.", spec: "Proof Checking", anchor: "Symm" },
+  0x1a: { title: "Cong", rule: "S, (t e1 ... en) =?= (t e1' ... en') --> S, en =?= en', ..., e1 =?= e1'", text: "Congruence: both sides must be applications of the same term t; replaces the obligation by one obligation per argument, pushed in reverse so that e1 =?= e1' is on top.", spec: "Proof Checking", anchor: "Cong" },
+  0x1b: {
+    title: "Unfold",
+    rule: "S, (t e1 ... en) =?= e', e --> S, e =?= e'   where Unify(t): e1, ..., en; e --> H'; .",
+    text: "Unfolds a definition. Pops e (the claimed expansion) and the obligation whose left side is an application of def t; runs t's unify stream with e1..en as the substitution to check that e is t's value instantiated; then leaves e =?= e' to be proved.",
+    spec: "Proof Checking",
+    anchor: "Unfold",
+  },
+  0x1c: { title: "ConvCut", rule: "S, e1 =?= e2 --> S, e1 = e2, e1 =?= e2", text: "Keeps a copy of the obligation as a conversion proof e1 = e2 beneath it, so that once the obligation is discharged the conversion can be saved and reused.", spec: "Proof Checking", anchor: "ConvCut" },
+  0x1e: { title: "ConvSave", rule: "H; S, e1 = e2 --> H, e1 = e2; S", text: "Moves a proved conversion from the stack to the heap. A later Ref to it discharges an identical obligation.", spec: "Proof Checking", anchor: "ConvSave" },
+  0x1f: { title: "Save", rule: "H; S, s --> H, s; S, s", text: "Appends the top stack element (an expression, a proof, or a conversion, but not an obligation) to the heap without popping it. This is how sharing is expressed: later Ref commands get the same node.", spec: "Proof Checking", anchor: "Save" },
+  0x20: { title: "Sorry", rule: "S, e --> S, |- e   or   S, e1 =?= e2 --> S", text: "Admits the goal without proof: turns an expression into a proof of it, or drops a conversion obligation. The verifier records that Sorry was used and must not report the file as fully verified.", spec: "Proof Checking", anchor: "Sorry" },
+};
+
+export const UNIFY_OP_EXPLAIN: Record<number, OpExplanation> = {
+  0x00: { title: "END", text: "Ends the unify stream. It is redundant, since the shape of the stream is fixed by the arities of the terms in it, but the verifier must find it at least 5 bytes before the end of the file.", spec: "Unify Stream", anchor: "END" },
+  0x30: { title: "UTerm t", rule: "S, (t e1 ... en) --> S, en, ..., e1", text: "The expression on top of the unify stack must be an application of term t; its arguments are pushed back in reverse order so that e1 is matched next. In polish notation terms, this is the constructor and the following commands are its arguments.", spec: "Unification", anchor: "UTerm" },
+  0x31: { title: "UTermSave t", rule: "H; S, (t e1 ... en) --> H, (t e1 ... en); S, en, ..., e1", text: "UTerm t, but the matched application is first appended to the unify heap so a later URef can require the same node again. This is how a def value or theorem statement expresses a shared subterm.", spec: "Unification", anchor: "UTermSave" },
+  0x32: { title: "URef i", rule: "H; S, H[i] --> H; S", text: "The expression on top of the unify stack must be exactly (pointer-equal to) unify heap entry i. Entries below num_args are the substitution for the declaration's variables; later entries were appended by UTermSave and UDummy.", spec: "Unification", anchor: "URef" },
+  0x33: { title: "UDummy s", rule: "H; S, x --> H, x; S", text: "Only in def values: the expression on top must be a bound variable of sort s not occurring in anything already on the unify heap. It is appended to the heap as the next dummy.", spec: "Unification", anchor: "UDummy" },
+  0x36: { title: "UHyp", rule: "MS, |- e; S --> MS; S, e", text: "Only in theorem statements: pops a proof from the main stack and pushes its statement onto the unify stack, where the following commands must match it against the hypothesis. The stream lists the conclusion first and then the hypotheses last-first, matching the order proofs are pushed.", spec: "Unification", anchor: "UHyp" },
+};
+
+export const STMT_EXPLAIN: Record<string, OpExplanation> = {
+  Sort: { title: "Sort statement", text: "Declares the next sort. It has no body: the data field is the size of this one command.", spec: "Proof Stream", anchor: "Sort" },
+  Term: { title: "Term statement", text: "Declares the next term constructor. It has no body. Term and Def share opcode 0x05; the is_def bit in the term table says which this is.", spec: "Proof Stream", anchor: "Term" },
+  Def: { title: "Def statement", text: "Declares the next term as a public definition. The body constructs the definition's value on the stack; the verifier unifies it against the unify stream stored with the term's binders, which also rules out cyclic values.", spec: "Proof Stream", anchor: "Def" },
+  LocalDef: { title: "LocalDef statement", text: "Like Def, but the definition has no counterpart in the MM0 file and is not exported.", spec: "Proof Stream", anchor: "LocalDef" },
+  Axiom: { title: "Axiom statement", text: "Declares the next theorem-table entry as an axiom. The body constructs each hypothesis (each followed by Hyp) and then the conclusion expression, with no proof.", spec: "Proof Stream", anchor: "Axiom" },
+  Thm: { title: "Thm statement", text: "Declares the next theorem-table entry as a public theorem. The body constructs the hypotheses and then a proof of the conclusion.", spec: "Proof Stream", anchor: "Thm" },
+  LocalThm: { title: "LocalThm statement", text: "Like Thm, but local: the theorem has no counterpart in the MM0 file.", spec: "Proof Stream", anchor: "LocalThm" },
+  END: { title: "END of the proof stream", text: "Not a statement: the zero byte after the last statement. It must begin at least 5 bytes before the end of the file.", spec: "Proof Stream", anchor: "END" },
+};

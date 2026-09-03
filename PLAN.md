@@ -350,12 +350,12 @@ mmb-viz/
 
 ## 7. Milestones
 
-M0, skeleton (usable on day one): scaffold, load a file, decode header and
+M0, skeleton (done 2026-09-03): scaffold, load a file, decode header and
 tables and index, hexdump with region coloring, file map, structure tree.
 
-M1, complete layout: streams disassembled, every byte owned, bit views,
-declarations browser, spec companion, problems surfaced for malformed
-files. Span partition test green on the corpus.
+M1, complete layout (done 2026-09-03): streams disassembled, every byte
+owned, bit views, declarations browser, spec companion, problems surfaced
+for malformed files. Span partition test green on the corpus.
 
 M2, machine: stepper with all opcodes and checks, corpus and oracle tests
 green. Debugger UI with step/back/continue, stack/heap/hyps panels,

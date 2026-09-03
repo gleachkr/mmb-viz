@@ -18,5 +18,40 @@
     "file": "gi_header_p_index_overflow.mmb",
     "title": "Fail case: index pointer overflow",
     "description": "An mm0 test file whose header p_index points far outside the file. The layout parser must report this without crashing."
+  },
+  {
+    "file": "mutant_bad_magic.mmb",
+    "title": "Fail case: wrong magic",
+    "description": "The tutorial file with its second magic byte changed. Everything else parses; a verifier rejects it at byte 0."
+  },
+  {
+    "file": "mutant_reserved_bits.mmb",
+    "title": "Fail case: reserved bits set",
+    "description": "Reserved fields that must be zero are set: in the header, in a sort byte, in a term table entry, and bit 55 of an arg."
+  },
+  {
+    "file": "mutant_forward_ref.mmb",
+    "title": "Fail case: forward reference",
+    "description": "The proof of mpd (theorem 8) cites theorem 9 (syl), which is declared after it. The layout is intact; the reference is illegal."
+  },
+  {
+    "file": "mutant_circular_proof.mmb",
+    "title": "Fail case: circular proof",
+    "description": "The proof of a1i (theorem 6) is replaced by one that applies a1i itself. mm0-c rejects the self-reference; Aufbau (as of 2026-09) accepts it."
+  },
+  {
+    "file": "mutant_unify_arity.mmb",
+    "title": "Fail case: unify stream too long",
+    "description": "The unify stream of def `and` starts with URef instead of UTerm, so the value is complete after one command and the rest of the stream is unexpected."
+  },
+  {
+    "file": "mutant_unknown_opcode.mmb",
+    "title": "Fail case: unknown opcode",
+    "description": "The first command of the proof of `id` is opcode 0x3f, which the spec does not define."
+  },
+  {
+    "file": "mutant_truncated.mmb",
+    "title": "Fail case: truncated file",
+    "description": "The tutorial file cut off in the middle of the proof stream: the index pointer and several statements run past the end."
   }
 ]

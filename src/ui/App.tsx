@@ -3,8 +3,9 @@ import { TopBar } from "./TopBar";
 import { FileMap } from "./FileMap";
 import { HexDump } from "./HexDump";
 import { StructureTree } from "./StructureTree";
+import { Declarations } from "./Declarations";
 import { Inspector } from "./Inspector";
-import { loaded, loadBytes, loadExample, goBack, showTree, showInspector, toggleTree, toggleInspector } from "./state";
+import { loaded, loadBytes, loadExample, goBack, showTree, showInspector, toggleTree, toggleInspector, leftTab, setLeftTab } from "./state";
 
 export function App() {
   onMount(() => {
@@ -30,6 +31,7 @@ export function App() {
       if (e.target instanceof HTMLElement && ["INPUT", "SELECT", "TEXTAREA"].includes(e.target.tagName)) return;
       if (e.key === "[") toggleTree();
       if (e.key === "]") toggleInspector();
+      if (e.key === "d" || e.key === "D") setLeftTab(leftTab() === "decls" ? "structure" : "decls");
     });
     const params = new URLSearchParams(location.hash.replace(/^#/, ""));
     const ex = params.get("example");
@@ -44,7 +46,17 @@ export function App() {
         <main class="workspace" classList={{ "no-left": !showTree(), "no-right": !showInspector() }}>
           <Show when={showTree()}>
             <aside class="pane pane-left">
-              <StructureTree />
+              <div class="tabs" role="tablist">
+                <button class="tab" role="tab" classList={{ on: leftTab() === "structure" }} onClick={() => setLeftTab("structure")}>
+                  Structure
+                </button>
+                <button class="tab" role="tab" classList={{ on: leftTab() === "decls" }} onClick={() => setLeftTab("decls")}>
+                  Declarations
+                </button>
+              </div>
+              <Show when={leftTab() === "structure"} fallback={<Declarations />}>
+                <StructureTree />
+              </Show>
             </aside>
           </Show>
           <section class="pane pane-center">
@@ -73,8 +85,8 @@ function Welcome() {
           colored by the structure it belongs to.
         </p>
         <p class="hint">
-          What you get in this build: the annotated hexdump, a proportional file map, the structure tree, and an inspector that decodes every field with the relevant
-          passage of the spec. The steppable verifier comes next.
+          What you get in this build: the annotated hexdump, a proportional file map, the structure tree, a declarations browser with MM0-style signatures, stream
+          disassembly, bit-field diagrams, and an inspector that quotes the relevant passage of the spec. The steppable verifier comes next.
         </p>
         <div class="welcome-actions">
           <button class="btn primary" onClick={() => void loadExample("tutorial.mmb")}>

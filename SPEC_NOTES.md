@@ -35,3 +35,21 @@ text: the tool should describe what files actually contain.
    file `dummy_reserved_bit.mmb` has a def with 56 dummies. Its layout is
    fully well-formed; the rejection happens in the verifier when the 56th
    `Dummy` command would need dependency bit 55 (Aufbau: `TooManyBoundVars`).
+
+6. **Self-reference is a forward reference.** mm0-c increments its running
+   sort/term/theorem counters only after a statement has been verified
+   (`verifier.c`, `g_num_terms++` after the def's proof and `g_num_thms++`
+   after the theorem's proof), so a def cannot mention itself in its value
+   and a theorem cannot cite itself in its proof. Aufbau (as of 2026-09)
+   passes `term_count + 1` and `thm_count + 1` as the available counts to
+   `verifyDef` and `verifyThm`, which lets a theorem prove itself by `Thm`
+   on its own index. `public/examples/mutant_circular_proof.mmb` is a
+   25-byte proof of `a1i` that does exactly that; mm0-c should reject it and
+   Aufbau accepts it. This tool follows mm0-c and reports the self-reference
+   as a layout problem.
+
+7. **Command encodings need not be minimal.** The `(cmd, data)` length tag
+   only says how many data bytes follow; `Ref 0` may be written as `12`,
+   `52 00`, `92 00 00`, or `d2 00 00 00 00`. mm0-rs always emits the shortest
+   form. The mutant generator uses wider forms to replace a proof body with
+   one of exactly the same length without moving anything else in the file.

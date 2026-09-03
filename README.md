@@ -12,25 +12,40 @@ MM0/MMB verifier and compiler. The plan for the whole project is in
 
 ## Status
 
-Milestone M0 is done:
+Milestones M0 and M1 are done:
 
-- annotating parser in `src/core/layout.ts` that turns a file into a span tree
-  in which every byte has an owner (tested: the leaves partition every corpus
-  file exactly, and well-formed files produce no unaccounted bytes);
+- annotating parser in `src/core/layout.ts` that turns a file into a span
+  tree in which every byte has an owner (tested: the leaves partition every
+  corpus file exactly, and well-formed files produce no unaccounted bytes);
 - decoded header, sort table, term and theorem tables, binder data, inline
   unify streams, the proof stream's statement layer, and the three index
   tables (`Name`, `VarN`, `HypN`);
-- proportional file map, virtualized hexdump (16 bytes per row, lazy decoding
-  of proof bodies), structure tree, and inspector with spec explanations;
-- bundled examples, including two malformed files that exercise error
-  tolerance.
+- stream disassembly (`src/core/streams.ts`): every unify and proof command
+  with its operand resolved to a name, a static heap map so each `Ref i`
+  points at the command that produced heap entry `i`, and unify streams
+  decoded into expressions;
+- declarations browser with MM0-style signatures (`term imp: wff > wff >
+  wff`, `theorem mpd (a b c: wff)` with hypotheses and conclusion), filters
+  by kind, visibility, problems, and use of `Sorry`;
+- bit-field diagrams for `arg`, `ret_sort`, sort modifiers, and the
+  `(cmd, data)` prefix byte;
+- spec companion: the vendored spec rendered by section, with the rule or
+  table row for the selected field highlighted;
+- static checks beyond structure: forward and self references, unify stream
+  shape (too short, too long, `UHyp`/`UDummy` in the wrong kind of stream),
+  unknown opcodes, and heap indices used before they exist;
+- proportional file map, virtualized hexdump (16 bytes per row, lazy
+  decoding of proof bodies), structure tree, and inspector;
+- bundled examples, including seven fail-case files generated from the
+  tutorial by `scripts/make-mutants.mjs` (each exercises one problem, and
+  the tests regenerate them to check they match).
 
 Keyboard: `[` and `]` toggle the structure tree and inspector panes (they
-start hidden on narrow viewports); Alt+Left goes back after following a
-pointer.
+start hidden on narrow viewports); `d` switches the left pane between the
+structure tree and the declarations browser; Alt+Left goes back after
+following a pointer.
 
-Next (M1 and M2): every-byte-owned stream disassembly views, the declarations
-browser, then the steppable verifier and debugger.
+Next (M2): the steppable verifier and debugger.
 
 ## Develop
 
@@ -53,9 +68,13 @@ src/core/     pure TypeScript, no DOM
   spans.ts      span tree types and invariants
   opcodes.ts    statement, proof, and unify opcode tables
   layout.ts     the annotating parser
-  explain.ts    spec-derived explanations per span kind
+  streams.ts    disassembly, static heap map, unify expressions
+  decls.ts      declaration summaries and MM0-style signatures
+  spec.ts       spec sections and the markdown renderer
+  explain.ts    spec-derived explanations per span kind and opcode
 src/ui/       Solid.js components and styling
 public/examples/  bundled .mmb files and their manifest
+scripts/      mutants.mjs (fail-case patch table), make-mutants.mjs
 spec/mmb.md   vendored MMB spec
 tests/        vitest
 ```
