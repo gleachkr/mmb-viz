@@ -1,0 +1,22 @@
+[
+  {
+    "file": "tutorial.mmb",
+    "title": "MM1 tutorial (small)",
+    "description": "The compiled output of the mm0 tutorial file 03-mm1-intro. One sort, four terms, fifteen theorems, with a debugging index."
+  },
+  {
+    "file": "peano.mmb",
+    "title": "Peano arithmetic (large)",
+    "description": "Peano arithmetic from the mm0 examples: 170 terms and 2723 theorems in 876 KB. Exercises virtualization and lazy decoding."
+  },
+  {
+    "file": "dummy_reserved_bit.mmb",
+    "title": "Fail case: reserved bit set in arg",
+    "description": "An mm0 test file with no debugging index whose 56th dummy sets the reserved bit of an arg. Verifiers must reject it."
+  },
+  {
+    "file": "gi_header_p_index_overflow.mmb",
+    "title": "Fail case: index pointer overflow",
+    "description": "An mm0 test file whose header p_index points far outside the file. The layout parser must report this without crashing."
+  }
+]
