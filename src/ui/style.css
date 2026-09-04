@@ -328,7 +328,7 @@ button { font: inherit; color: inherit; }
 /* ---------- inspector ---------- */
 
 .inspector { padding-bottom: 24px; }
-.inspector > *:not(.pane-title):not(.problem-list) { margin-left: 12px; margin-right: 12px; }
+.inspector > *:not(.pane-title):not(.insp-tabs):not(.insp-body) { margin-left: 12px; margin-right: 12px; }
 .crumbs { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-top: 10px; font-family: var(--mono); font-size: 11px; }
 .crumb.link { cursor: pointer; }
 .crumb.link:hover { outline: 1px solid var(--ink); }
@@ -531,3 +531,17 @@ button { font: inherit; color: inherit; }
 .spec-body .hit { background: #fff3b0; outline: 2px solid var(--accent); outline-offset: 2px; }
 .spec-body li.hit { padding: 4px 6px; list-style: none; margin-left: -18px; }
 .spec-body tr.hit td { background: #fff3b0; }
+
+/* ---------- inspector tabs ---------- */
+
+.insp-tabs { margin-top: 12px; position: sticky; top: 31px; z-index: 1; }
+.insp-tabs .tab { flex: 0 1 auto; padding-left: 12px; padding-right: 12px; display: inline-flex; align-items: baseline; gap: 6px; }
+.insp-tabs .tab.empty { color: #b3aca0; }
+.insp-tabs .tab.empty.on { color: var(--ink-2); }
+.tab-n { font-size: 10px; letter-spacing: 0; text-transform: none; color: var(--ink-3); max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tab-n.bad { color: var(--accent); font-weight: 600; }
+.insp-body { padding: 0 12px; }
+.insp-body .decl-card, .insp-body .spec { margin-top: 10px; border-top: none; padding-top: 0; }
+.insp-body .problem-list { margin: 10px -12px 0; }
+.insp-body .problem-list .problem-summary { padding: 0 12px 8px; font-size: 12.5px; }
+.insp-body .kv { margin-top: 10px; }

@@ -33,6 +33,11 @@ export type LeftTab = "structure" | "decls";
 const [leftTab, setLeftTab] = createSignal<LeftTab>("structure");
 export { leftTab, setLeftTab };
 
+/** Which inspector subtab is showing: the field, its declaration, the spec, or the file's problems. */
+export type InspTab = "field" | "decl" | "spec" | "problems";
+const [inspTab, setInspTab] = createSignal<InspTab>("field");
+export { inspTab, setInspTab };
+
 /**
  * Results of the deep scan that runs shortly after a file loads: every lazy
  * stream is decoded so that the problem list is complete, the declarations
@@ -87,7 +92,9 @@ export function goToDecl(ref: DeclRef): void {
   const L = loaded()?.layout;
   if (!L) return;
   const d = ref.kind === "sort" ? L.sorts[ref.id]?.span : ref.kind === "term" ? L.terms[ref.id]?.entrySpan : L.thms[ref.id]?.entrySpan;
-  if (d) goTo(d.start);
+  if (!d) return;
+  goTo(d.start);
+  setInspTab("decl");
 }
 
 export async function loadExample(file: string): Promise<void> {

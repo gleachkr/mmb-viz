@@ -101,6 +101,12 @@ export interface Span {
   owner?: DeclRef;
   /** For pointer fields: the absolute file offset pointed at (0 = null). */
   target?: number;
+  /**
+   * What reaching `target` means, for the jump button: "follow pointer to
+   * the term table" for a real pointer, "look up term 3 (imp) in the term
+   * table" for an index, "skip past this statement" for a length.
+   */
+  jump?: string;
   /** Physical children, sorted by start, contained in [start, end). */
   children?: Span[] | (() => Span[]);
   problems?: Problem[];

@@ -5,7 +5,7 @@ import { HexDump } from "./HexDump";
 import { StructureTree } from "./StructureTree";
 import { Declarations } from "./Declarations";
 import { Inspector } from "./Inspector";
-import { loaded, loadBytes, loadExample, goBack, showTree, showInspector, toggleTree, toggleInspector, leftTab, setLeftTab } from "./state";
+import { loaded, loadBytes, loadExample, goBack, showTree, showInspector, toggleTree, toggleInspector, leftTab, setLeftTab, setInspTab } from "./state";
 
 export function App() {
   onMount(() => {
@@ -32,6 +32,10 @@ export function App() {
       if (e.key === "[") toggleTree();
       if (e.key === "]") toggleInspector();
       if (e.key === "d" || e.key === "D") setLeftTab(leftTab() === "decls" ? "structure" : "decls");
+      if (e.key === "1") setInspTab("field");
+      if (e.key === "2") setInspTab("decl");
+      if (e.key === "3") setInspTab("spec");
+      if (e.key === "4") setInspTab("problems");
     });
     const params = new URLSearchParams(location.hash.replace(/^#/, ""));
     const ex = params.get("example");

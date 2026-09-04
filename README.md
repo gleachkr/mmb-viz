@@ -35,15 +35,16 @@ Milestones M0 and M1 are done:
   shape (too short, too long, `UHyp`/`UDummy` in the wrong kind of stream),
   unknown opcodes, and heap indices used before they exist;
 - proportional file map, virtualized hexdump (16 bytes per row, lazy
-  decoding of proof bodies), structure tree, and inspector;
+  decoding of proof bodies), structure tree, and a tabbed inspector
+  (Field, Declaration, Spec, Problems);
 - bundled examples, including seven fail-case files generated from the
   tutorial by `scripts/make-mutants.mjs` (each exercises one problem, and
   the tests regenerate them to check they match).
 
 Keyboard: `[` and `]` toggle the structure tree and inspector panes (they
 start hidden on narrow viewports); `d` switches the left pane between the
-structure tree and the declarations browser; Alt+Left goes back after
-following a pointer.
+structure tree and the declarations browser; `1`–`4` pick the inspector tab;
+Alt+Left goes back after a jump.
 
 Next (M2): the steppable verifier and debugger.
 

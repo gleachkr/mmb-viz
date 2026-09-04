@@ -7,9 +7,10 @@ import { SPEC_SECTIONS, specSection, type SpecSection } from "../core/spec";
  * navigate within the panel; the selection's own section comes back when
  * the selection changes.
  */
-export function SpecPanel(props: { section?: string; anchor?: string }) {
+export function SpecPanel(props: { section?: string; anchor?: string; full?: boolean }) {
   const [override, setOverride] = createSignal<string | undefined>();
-  const [expanded, setExpanded] = createSignal(false);
+  const [expandedSig, setExpanded] = createSignal(false);
+  const expanded = () => props.full || expandedSig();
   let box!: HTMLDivElement;
 
   createEffect(on(() => props.section, () => setOverride(undefined)));
@@ -57,9 +58,11 @@ export function SpecPanel(props: { section?: string; anchor?: string }) {
                 back
               </button>
             </Show>
-            <button class="link small" onClick={() => setExpanded(!expanded())}>
-              {expanded() ? "shrink" : "expand"}
-            </button>
+            <Show when={!props.full}>
+              <button class="link small" onClick={() => setExpanded(!expanded())}>
+                {expanded() ? "shrink" : "expand"}
+              </button>
+            </Show>
           </div>
           <div class="spec-body" ref={box} onClick={onClick} innerHTML={s().html} />
         </div>
