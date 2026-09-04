@@ -357,9 +357,13 @@ M1, complete layout (done 2026-09-03): streams disassembled, every byte
 owned, bit views, declarations browser, spec companion, problems surfaced
 for malformed files. Span partition test green on the corpus.
 
-M2, machine: stepper with all opcodes and checks, corpus and oracle tests
-green. Debugger UI with step/back/continue, stack/heap/hyps panels,
-disassembly with pc, byte highlighting linked to the hexdump.
+M2, machine (done 2026-09-04): stepper with all opcodes and checks, corpus
+and oracle tests green (mm0-c built from ~/Projects/mm0 with a stub
+tutorial.mm0). Debugger UI with step/back/step over/continue, stack, heap,
+hyps, unify stack and heap panels, disassembly with pc, byte highlighting
+linked to the hexdump. Whole-file verification runs on the main thread in
+40 ms slices rather than in a worker (peano takes under a second), and time
+travel uses keyframes every 64 steps plus re-execution.
 
 M3, teaching features: step into unification, breakpoints, narrative panel
 with instantiated spec rules, expression identity and V/FV display, error

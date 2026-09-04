@@ -1,5 +1,5 @@
 import { createResource, For, Show } from "solid-js";
-import { loaded, loadBytes, loadExample, goBack, history, showTree, showInspector, toggleTree, toggleInspector, problems, scan } from "./state";
+import { loaded, loadBytes, loadExample, goBack, history, showTree, showInspector, toggleTree, toggleInspector, problems, scan, verification, showProblemsTab } from "./state";
 import { bytesLabel } from "./format";
 
 interface ExampleMeta {
@@ -74,6 +74,25 @@ export function TopBar() {
             <span class="stat muted">parsed in {L().parseMs.toFixed(0)} ms{scan() ? `, scanned in ${scan()!.ms.toFixed(0)} ms` : ""}</span>
             <Show when={problems().filter((p) => p.severity === "error").length}>
               {(n) => <span class="stat bad">{n()} problem{n() === 1 ? "" : "s"}</span>}
+            </Show>
+            <Show when={verification()}>
+              {(v) => (
+                <button class="verify-summary link-plain" onClick={showProblemsTab} title="verification of every statement by the stack machine; click for the list">
+                  <Show
+                    when={!v().running}
+                    fallback={
+                      <>
+                        <progress max={v().total} value={v().done} />
+                        <span>verifying {v().done}/{v().total}</span>
+                      </>
+                    }
+                  >
+                    <Show when={v().errors === 0 && v().sorry === 0} fallback={<span class="bad">✗ {v().errors} failing{v().sorry ? `, ${v().sorry} sorry` : ""}</span>}>
+                      <span>✓ verified · {v().steps.toLocaleString()} steps · {v().ms.toFixed(0)} ms</span>
+                    </Show>
+                  </Show>
+                </button>
+              )}
             </Show>
           </div>
         )}

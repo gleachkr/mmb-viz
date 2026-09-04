@@ -5,7 +5,8 @@ import { HexDump } from "./HexDump";
 import { StructureTree } from "./StructureTree";
 import { Declarations } from "./Declarations";
 import { Inspector } from "./Inspector";
-import { loaded, loadBytes, loadExample, goBack, showTree, showInspector, toggleTree, toggleInspector, leftTab, setLeftTab, setInspTab } from "./state";
+import { Debugger } from "./Debugger";
+import { loaded, loadBytes, loadExample, goBack, showTree, showInspector, toggleTree, toggleInspector, leftTab, setLeftTab, setInspTab, centerTab, setCenterTab, debug, debugGoto, debugStep, debugStepOver, debugStepBackOver, verification } from "./state";
 
 export function App() {
   onMount(() => {
@@ -36,6 +37,15 @@ export function App() {
       if (e.key === "2") setInspTab("decl");
       if (e.key === "3") setInspTab("spec");
       if (e.key === "4") setInspTab("problems");
+      if (e.key === "v" || e.key === "V") setCenterTab(centerTab() === "hex" ? "debug" : "hex");
+      if (centerTab() === "debug" && debug()) {
+        if (e.key === ".") debugStep(1);
+        if (e.key === ",") debugStep(-1);
+        if (e.key === ">") debugStepOver();
+        if (e.key === "<") debugStepBackOver();
+        if (e.key === "r" || e.key === "Home") debugGoto(0);
+        if (e.key === "e" || e.key === "End") debugGoto(debug()!.trace.length);
+      }
     });
     const params = new URLSearchParams(location.hash.replace(/^#/, ""));
     const ex = params.get("example");
@@ -64,7 +74,20 @@ export function App() {
             </aside>
           </Show>
           <section class="pane pane-center">
-            <HexDump />
+            <div class="tabs" role="tablist">
+              <button class="tab" role="tab" classList={{ on: centerTab() === "hex" }} onClick={() => setCenterTab("hex")} title="the annotated bytes (v toggles)">
+                Hexdump
+              </button>
+              <button class="tab" role="tab" classList={{ on: centerTab() === "debug" }} onClick={() => setCenterTab("debug")} title="step through a proof (v toggles)">
+                Debugger
+                <Show when={verification()?.errors}>
+                  <span class="tab-n bad">{verification()!.errors} failing</span>
+                </Show>
+              </button>
+            </div>
+            <Show when={centerTab() === "hex"} fallback={<Debugger />}>
+              <HexDump />
+            </Show>
           </section>
           <Show when={showInspector()}>
             <aside class="pane pane-right">
@@ -89,8 +112,9 @@ function Welcome() {
           colored by the structure it belongs to.
         </p>
         <p class="hint">
-          What you get in this build: the annotated hexdump, a proportional file map, the structure tree, a declarations browser with MM0-style signatures, stream
-          disassembly, bit-field diagrams, and an inspector that quotes the relevant passage of the spec. The steppable verifier comes next.
+          What you get: the annotated hexdump, a proportional file map, the structure tree, a declarations browser with MM0-style signatures, stream disassembly,
+          bit-field diagrams, an inspector that quotes the relevant passage of the spec, and a debugger that runs every proof through the MMB stack machine one
+          command at a time.
         </p>
         <div class="welcome-actions">
           <button class="btn primary" onClick={() => void loadExample("tutorial.mmb")}>

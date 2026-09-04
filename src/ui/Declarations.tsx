@@ -1,7 +1,7 @@
 import { createMemo, createSignal, For, Show } from "solid-js";
 import { type DeclCategory, type DeclSummary } from "../core/decls";
 import { CATEGORY_CLASS } from "./DeclCard";
-import { goToDecl, scan, selectedOwner } from "./state";
+import { goToDecl, scan, selectedOwner, resultOf, verification } from "./state";
 
 const CATEGORIES: DeclCategory[] = ["sort", "term", "def", "axiom", "theorem"];
 const PAGE = 200;
@@ -17,6 +17,7 @@ export function Declarations() {
   const [onlyLocal, setOnlyLocal] = createSignal(false);
   const [onlyProblems, setOnlyProblems] = createSignal(false);
   const [onlySorry, setOnlySorry] = createSignal(false);
+  const [onlyFailed, setOnlyFailed] = createSignal(false);
   const [shown, setShown] = createSignal(PAGE);
 
   const toggleCat = (c: DeclCategory) => {
@@ -35,6 +36,7 @@ export function Declarations() {
       if (onlyLocal() && !d.local) return false;
       if (onlyProblems() && d.problems.length === 0) return false;
       if (onlySorry() && !(d.statement && s.sorry.has(d.statement.index))) return false;
+      if (onlyFailed() && !(d.statement && resultOf(d.statement.index)?.status === "error")) return false;
       if (q && !d.name.toLowerCase().includes(q) && !d.signature.toLowerCase().includes(q)) return false;
       return true;
     });
@@ -84,6 +86,9 @@ export function Declarations() {
             <button class="chip" classList={{ on: onlySorry() }} onClick={() => setOnlySorry(!onlySorry())} title="only proofs that use Sorry">
               sorry <span class="chip-n">{scan()!.sorry.size}</span>
             </button>
+            <button class="chip" classList={{ on: onlyFailed() }} onClick={() => setOnlyFailed(!onlyFailed())} title="only statements the verifier rejects">
+              failed <span class="chip-n">{verification()?.errors ?? 0}</span>
+            </button>
           </div>
           <div class="decl-count muted">
             {filtered().length} of {scan()!.decls.length}
@@ -94,6 +99,9 @@ export function Declarations() {
             {(d) => (
               <div class="decl-row" classList={{ selected: isSelected(d), problem: d.problems.length > 0 }} onClick={() => goToDecl(d.ref)} title={d.signature}>
                 <i class={`swatch ${CATEGORY_CLASS[d.category]}`} />
+                <Show when={d.statement?.hasProof}>
+                  <i class={`vstat ${resultOf(d.statement!.index)?.status ?? ""}`} title={resultOf(d.statement!.index)?.status ?? "not verified yet"} />
+                </Show>
                 <span class="decl-row-name">{d.name}</span>
                 <span class="decl-row-sig">{sigTail(d)}</span>
               </div>

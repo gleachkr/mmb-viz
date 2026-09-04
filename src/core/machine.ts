@@ -181,7 +181,14 @@ export class Machine {
   /** "def" for Def/LocalDef bodies, "thm" for Axiom/Thm/LocalThm bodies. */
   readonly mode: "def" | "thm";
   readonly cmds: Span[];
+  /**
+   * Expression arena. Nodes are deterministic, so a restore only moves
+   * `arenaLen` back and re-execution overwrites the same slots with the same
+   * nodes; the array itself is never truncated, which keeps every keyframe's
+   * nodes reachable.
+   */
   readonly arena: ExprNode[] = [];
+  arenaLen = 0;
 
   phase: Phase = "init";
   /** Index into `cmds` of the next proof command. */
@@ -229,7 +236,7 @@ export class Machine {
       dummies: this.dummies,
       sorryUsed: this.sorryUsed,
       unify: u ? { ...u, ustack: u.ustack.slice(), uheap: u.uheap.slice() } : undefined,
-      arenaLen: this.arena.length,
+      arenaLen: this.arenaLen,
       stepCount: this.stepCount,
     };
   }
@@ -244,9 +251,12 @@ export class Machine {
     this.dummies = s.dummies;
     this.sorryUsed = s.sorryUsed;
     this.unify = s.unify ? { ...s.unify, ustack: s.unify.ustack.slice(), uheap: s.unify.uheap.slice() } : undefined;
-    this.arena.length = s.arenaLen;
+    this.arenaLen = s.arenaLen;
     this.bvNames.length = 0;
-    for (const n of this.arena) if (n.bound && n.bv !== undefined) this.bvNames[n.bv] = n.name ?? `bv${n.bv}`;
+    for (let i = 0; i < this.arenaLen; i++) {
+      const n = this.arena[i]!;
+      if (n.bound && n.bv !== undefined) this.bvNames[n.bv] = n.name ?? `bv${n.bv}`;
+    }
     this.stepCount = s.stepCount;
     this.error = undefined;
   }
@@ -254,7 +264,7 @@ export class Machine {
   // -- printing ---------------------------------------------------------------
 
   node(id: number): ExprNode {
-    const n = this.arena[id];
+    const n = id < this.arenaLen ? this.arena[id] : undefined;
     if (!n) throw new Fail(`internal: no expression #${id}`);
     return n;
   }
@@ -265,7 +275,7 @@ export class Machine {
 
   /** Print an expression, MM0 style, outermost parentheses omitted. */
   show(id: number, top = true): string {
-    const n = this.arena[id];
+    const n = id < this.arenaLen ? this.arena[id] : undefined;
     if (!n) return `#${id}`;
     if (n.kind === "var") return n.name ?? `?${id}`;
     const name = this.termName(n.term!);
@@ -352,8 +362,8 @@ export class Machine {
   }
 
   private alloc(n: Omit<ExprNode, "id" | "by">): ExprNode {
-    const node: ExprNode = { ...n, id: this.arena.length, by: this.cur.index };
-    this.arena.push(node);
+    const node: ExprNode = { ...n, id: this.arenaLen, by: this.cur.index };
+    this.arena[this.arenaLen++] = node;
     this.cur.allocated.push(node.id);
     if (node.bound && node.bv !== undefined) this.bvNames[node.bv] = node.name ?? `bv${node.bv}`;
     return node;

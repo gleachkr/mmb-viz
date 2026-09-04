@@ -4,7 +4,7 @@ import { showStatement, summarize, type DeclSummary } from "../core/decls";
 import { type DeclRef } from "../core/spans";
 import { disassembleProof } from "../core/streams";
 import { Disassembly } from "./Disassembly";
-import { loaded, goTo, selected } from "./state";
+import { loaded, goTo, selected, resultOf, openDebugger } from "./state";
 import { bytesLabel } from "./format";
 
 export const CATEGORY_CLASS: Record<DeclSummary["category"], string> = {
@@ -67,6 +67,22 @@ export function DeclCard(props: { owner: DeclRef }) {
               </button>
             </Show>
           </div>
+
+          <Show when={dd().statement?.hasProof}>
+            <div class="dbg-result">
+              <Show when={resultOf(dd().statement!.index)} fallback={<span class="muted">not verified yet</span>}>
+                {(r) => (
+                  <>
+                    <i class={`vstat ${r().status}`} />
+                    <span>{r().status === "ok" ? `verifies in ${r().steps} steps` : r().status === "sorry" ? `uses Sorry (${r().steps} steps)` : `fails at step ${(r().error?.step ?? 0) + 1}: ${r().error?.message}`}</span>
+                  </>
+                )}
+              </Show>
+              <button class="btn small" onClick={() => openDebugger(dd().statement!, resultOf(dd().statement!.index)?.status === "error" ? Infinity : 0)} title="step through this proof in the debugger">
+                ▶ debug
+              </button>
+            </div>
+          </Show>
 
           <Show when={dd().problems.length}>
             <div class="problems">

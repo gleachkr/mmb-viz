@@ -12,7 +12,7 @@ MM0/MMB verifier and compiler. The plan for the whole project is in
 
 ## Status
 
-Milestones M0 and M1 are done:
+Milestones M0, M1, and M2 are done:
 
 - annotating parser in `src/core/layout.ts` that turns a file into a span
   tree in which every byte has an owner (tested: the leaves partition every
@@ -37,16 +37,41 @@ Milestones M0 and M1 are done:
 - proportional file map, virtualized hexdump (16 bytes per row, lazy
   decoding of proof bodies), structure tree, and a tabbed inspector
   (Field, Declaration, Spec, Problems);
-- bundled examples, including seven fail-case files generated from the
-  tutorial by `scripts/make-mutants.mjs` (each exercises one problem, and
-  the tests regenerate them to check they match).
+- the verifier (`src/core/machine.ts`): the MMB stack machine written to be
+  watched, with an explicit stack, heap, hypothesis list, `next_bv`, unify
+  frames, and an append-only expression arena; every `step()` returns what
+  it read, checked, popped, pushed, and allocated, and every check is named
+  after the spec's rule with the section it lives in;
+- whole-file verification runs in the background as soon as a file loads
+  (peano's 583k steps take under a second) and feeds the declarations
+  browser (status dots, a "failed" filter), the Problems tab, and the top
+  bar;
+- the debugger (center pane): step, step back, step over and back over a
+  unification, run to the end or to the error, a slider, the proof stream
+  and (inside a unification) the unify stream with the program counter,
+  panels for the stack, heap, hypotheses, unify stack and unify heap with
+  changed entries highlighted and node ids visible, and a narrative for
+  each step with its checks and the bytes it read; the hexdump highlights
+  the current command and what it consulted, and any proof command in the
+  hexdump can be opened in the debugger at that step;
+- tests against mm0-c as an oracle (`tests/oracle.test.ts`): accept/reject
+  and the failing statement must agree on the tutorial, its mutants, peano,
+  and the mm0 repository's run tests; known divergences are listed there
+  and in `SPEC_NOTES.md`;
+- bundled examples, including eleven fail-case files generated from the
+  tutorial by `scripts/make-mutants.mjs` (each exercises one problem, at the
+  layout level or in the verifier, and the tests regenerate them to check
+  they match).
 
 Keyboard: `[` and `]` toggle the structure tree and inspector panes (they
 start hidden on narrow viewports); `d` switches the left pane between the
-structure tree and the declarations browser; `1`–`4` pick the inspector tab;
-Alt+Left goes back after a jump.
+structure tree and the declarations browser; `v` switches the center pane
+between the hexdump and the debugger; `1`–`4` pick the inspector tab;
+Alt+Left goes back after a jump. In the debugger: `.` step, `,` back, `>`
+step over a unification, `<` back over one, `r` restart, `e` run to the end.
 
-Next (M2): the steppable verifier and debugger.
+Next (M3): breakpoints, the narrative panel with instantiated spec rules,
+expression identity and V/FV display, and the error explorer.
 
 ## Develop
 
@@ -73,9 +98,11 @@ src/core/     pure TypeScript, no DOM
   decls.ts      declaration summaries and MM0-style signatures
   spec.ts       spec sections and the markdown renderer
   explain.ts    spec-derived explanations per span kind and opcode
+  machine.ts    the stack machine: state, step(), checks, snapshots
+  verify.ts     traces with keyframes, whole-file verification
 src/ui/       Solid.js components and styling
 public/examples/  bundled .mmb files and their manifest
 scripts/      mutants.mjs (fail-case patch table), make-mutants.mjs
 spec/mmb.md   vendored MMB spec
-tests/        vitest
+tests/        vitest; tests/oracle/tutorial.mm0 is the stub the mm0-c oracle needs
 ```

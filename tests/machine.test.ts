@@ -96,6 +96,24 @@ describe("stepping", () => {
     }
   });
 
+  it("time travel across keyframes of a long proof", () => {
+    const P = parseLayout(load("peano.mmb"));
+    const st = P.statements.find((s) => s.decl && declName(P, s.decl) === "psetsep")!;
+    const t = new Trace(P, st);
+    expect(t.length).toBeGreaterThan(3000);
+    const m = new Machine(P, st);
+    const snaps = [m.snapshot()];
+    while (m.step()) snaps.push(m.snapshot());
+    // Jump around: forward past several keyframes, back before them, then to the end.
+    for (const k of [0, 1000, 3, t.length, 2000, 65, 64, 63, t.length - 1, 0, t.length]) {
+      const mk = t.at(k);
+      expect(mk.snapshot(), `step ${k}`).toEqual(snaps[k]);
+      // The nodes the state refers to are all present.
+      for (const e of mk.stack) if ("e" in e) expect(mk.node(e.e).id).toBe(e.e);
+    }
+    expect(t.at(t.length).show((t.at(t.length).stack[0] as { e: number }).e)).toBe(m.show((m.stack[0] as { e: number }).e));
+  });
+
   it("prints expressions with the declaration's variable names", () => {
     const t = new Trace(L, stmtOf("ax_2"));
     const m = t.at(t.length);

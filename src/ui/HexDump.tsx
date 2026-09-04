@@ -1,7 +1,7 @@
 import { createEffect, createMemo, createSignal, For, Show, on, onMount } from "solid-js";
 import { hex2, hexOffset } from "../core/bytes";
 import { childrenOf, spanChainAt, type Span } from "../core/spans";
-import { loaded, selected, hovered, select, hover, scrollRequest, selectedChain } from "./state";
+import { loaded, selected, hovered, select, hover, scrollRequest, selectedChain, debugSpans } from "./state";
 import { familyClass } from "./format";
 
 const BYTES_PER_ROW = 16;
@@ -35,24 +35,30 @@ export function HexDump() {
     return out;
   });
 
+  // Scroll to a requested offset, placing it a third of the way down.
+  const scrollTo = (req: { offset: number; n: number }) => {
+    if (req.n === 0) return;
+    const row = Math.floor(req.offset / BYTES_PER_ROW);
+    const target = row * ROW_H - viewH() / 3;
+    const top = scroller.scrollTop;
+    if (row * ROW_H < top || row * ROW_H + ROW_H > top + viewH()) {
+      scroller.scrollTop = Math.max(0, target);
+    }
+  };
+
   onMount(() => {
     const ro = new ResizeObserver(() => setViewH(scroller.clientHeight));
     ro.observe(scroller);
     setViewH(scroller.clientHeight);
+    // The hexdump can be mounted after a selection was made while it was hidden (debugger tab):
+    // bring that selection into view once the element is in the document.
+    requestAnimationFrame(() => {
+      setViewH(scroller.clientHeight);
+      scrollTo(scrollRequest());
+    });
   });
 
-  // Scroll to a requested offset, placing it a third of the way down.
-  createEffect(
-    on(scrollRequest, (req) => {
-      if (req.n === 0) return;
-      const row = Math.floor(req.offset / BYTES_PER_ROW);
-      const target = row * ROW_H - viewH() / 3;
-      const top = scroller.scrollTop;
-      if (row * ROW_H < top || row * ROW_H + ROW_H > top + viewH()) {
-        scroller.scrollTop = Math.max(0, target);
-      }
-    }),
-  );
+  createEffect(on(scrollRequest, scrollTo, { defer: true }));
 
   // Reset scroll when a new file loads.
   createEffect(on(loaded, () => scroller && (scroller.scrollTop = 0)));
@@ -85,7 +91,7 @@ export function HexDump() {
       </div>
       <div class="hex-scroller" ref={scroller} onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}>
         <div class="hex-spacer" style={{ height: `${rowCount() * ROW_H}px` }}>
-          <For each={rows()}>{(r) => <Row row={r} selLeaf={selLeaf()} selParent={selParent()} hovLeaf={hovLeaf()} />}</For>
+          <For each={rows()}>{(r) => <Row row={r} selLeaf={selLeaf()} selParent={selParent()} hovLeaf={hovLeaf()} pc={debugSpans().pc} reads={debugSpans().reads} />}</For>
         </div>
       </div>
       <StatusLine />
@@ -93,7 +99,7 @@ export function HexDump() {
   );
 }
 
-function Row(props: { row: number; selLeaf?: Span; selParent?: Span; hovLeaf?: Span }) {
+function Row(props: { row: number; selLeaf?: Span; selParent?: Span; hovLeaf?: Span; pc?: Span; reads: Span[] }) {
   const start = () => props.row * BYTES_PER_ROW;
 
   const cells = createMemo<Cell[]>(() => {
@@ -116,6 +122,8 @@ function Row(props: { row: number; selLeaf?: Span; selParent?: Span; hovLeaf?: S
       if (props.selLeaf && o >= props.selLeaf.start && o < props.selLeaf.end) cls += " sel";
       else if (props.selParent && o >= props.selParent.start && o < props.selParent.end) cls += " ctx";
       cls += edges(props.hovLeaf, o, "hov");
+      if (props.pc && o >= props.pc.start && o < props.pc.end) cls += " pc";
+      else for (const r of props.reads) if (o >= r.start && o < r.end) { cls += " rd"; break; }
       if (leaf.problems?.length) cls += " prob";
       out.push({ offset: o, byte: L.bytes.u8(o), cls, leaf });
     }

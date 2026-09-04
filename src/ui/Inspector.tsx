@@ -2,7 +2,7 @@ import { createMemo, For, Show } from "solid-js";
 import { hex, type Cmd } from "../core/bytes";
 import { EXPLAIN, PROOF_OP_EXPLAIN, STMT_EXPLAIN, UNIFY_OP_EXPLAIN, type OpExplanation } from "../core/explain";
 import { family, jumpText, type Problem, type Span, type SpanKind } from "../core/spans";
-import { loaded, selectedChain, goTo, history, goBack, problems, scan, selectedOwner, inspTab, setInspTab, type InspTab } from "./state";
+import { loaded, selectedChain, goTo, history, goBack, problems, scan, selectedOwner, inspTab, setInspTab, type InspTab, debugOffset, verification, openDebugger } from "./state";
 import { describeValue, familyClass, rangeLabel, FAMILY_TITLES } from "./format";
 import { BitView, bitLayoutFor } from "./BitView";
 import { DeclCard } from "./DeclCard";
@@ -234,6 +234,11 @@ function FieldTab(props: { span: Span; chain: Span[]; op: OpExplanation | undefi
             ← back
           </button>
         </Show>
+        <Show when={props.span.kind === "proof.cmd" || props.span.kind === "proof.stmt_cmd" || props.span.kind === "proof.body"}>
+          <button class="btn small" onClick={() => debugOffset(props.span.start)} title="open the debugger with the machine positioned just after this command">
+            ▶ debug {props.span.kind === "proof.cmd" ? "this command" : "this statement"}
+          </button>
+        </Show>
       </div>
 
       <Show when={chainProblems().length}>
@@ -300,6 +305,39 @@ function ProblemList() {
       <Show when={problems().length > 300}>
         <div class="muted skipped">… {problems().length - 300} more</div>
       </Show>
+      <VerificationProblems />
     </div>
+  );
+}
+
+/** Statements the stack machine rejects, from the whole-file run. */
+function VerificationProblems() {
+  const L = () => loaded()?.layout;
+  const failing = createMemo(() => (verification()?.results ?? []).filter((r): r is NonNullable<typeof r> => !!r && r.status !== "ok"));
+  return (
+    <Show when={verification()}>
+      {(v) => (
+        <>
+          <div class="vsection">Verification</div>
+          <div class="problem-summary muted">
+            <Show when={!v().running} fallback={`Verifying… ${v().done} of ${v().total} statements`}>
+              {v().errors === 0 && v().sorry === 0
+                ? `All ${v().total} statements verify (${v().steps.toLocaleString()} steps).`
+                : `${v().errors} statement${v().errors === 1 ? "" : "s"} fail${v().errors === 1 ? "s" : ""}${v().sorry ? `, ${v().sorry} use${v().sorry === 1 ? "s" : ""} Sorry` : ""}.`}
+            </Show>
+          </div>
+          <For each={failing().slice(0, 100)}>
+            {(r) => {
+              const st = () => L()!.statements[r.index]!;
+              return (
+                <button class={`problem link-row ${r.status === "error" ? "error" : "warning"}`} onClick={() => openDebugger(st(), Infinity)} title="open in the debugger at the failing step">
+                  <span class="mono">{hex(st().offset)}</span> {st().decl ? declName(L()!, st().decl!) : `statement ${r.index}`}: {r.status === "sorry" ? "uses Sorry" : r.error?.message}
+                </button>
+              );
+            }}
+          </For>
+        </>
+      )}
+    </Show>
   );
 }
