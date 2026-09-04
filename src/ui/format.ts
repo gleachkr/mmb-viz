@@ -1,7 +1,7 @@
 import { hex, type Cmd } from "../core/bytes";
 import { declName, type Layout } from "../core/layout";
 import { PROOF_OPS, UNIFY_OPS, STATEMENTS, SORT_MODIFIERS } from "../core/opcodes";
-import { family, type Span } from "../core/spans";
+import { family, jumpText, type JumpPart, type Span } from "../core/spans";
 
 /** Family -> CSS class suffix. Kept explicit so the palette is auditable. */
 export const FAMILIES = [
@@ -63,6 +63,8 @@ export interface ValueLine {
   /** Offset to jump to when clicked. */
   link?: number;
   mono?: boolean;
+  /** Rich value: pieces with their own links; replaces `value` when present. */
+  parts?: JumpPart[];
 }
 
 /** Turn a span's decoded value into key/value lines for the inspector. */
@@ -97,7 +99,7 @@ export function describeValue(s: Span, L: Layout): ValueLine[] {
       const name = table ? table[c.op]?.name : STATEMENTS[c.op]?.name ?? (c.op === 0 ? "END" : undefined);
       out.push({ key: "encoding", value: `${c.size} byte${c.size === 1 ? "" : "s"}: opcode ${hex(first & 0x3f, 2)}${c.dataBytes ? ` + ${c.dataBytes}-byte data` : ", no data"}`, mono: true });
       out.push({ key: "opcode", value: `${hex(c.op, 2)} ${name ?? "(unknown)"}`, mono: true });
-      if (c.dataBytes > 0) out.push({ key: "data", value: `${c.data} (${hex(c.data)})`, mono: true });
+      out.push({ key: "data", value: c.dataBytes > 0 ? `${c.data} (${hex(c.data)})` : "0 (implicit: no data bytes follow)", mono: true });
       break;
     }
     case "string":
@@ -112,7 +114,7 @@ export function describeValue(s: Span, L: Layout): ValueLine[] {
         out.push({ key: "value", value: JSON.stringify(v), mono: true });
       }
   }
-  if (s.jump && s.target !== undefined) out.push({ key: s.jump.name, value: s.jump.how, mono: true, link: s.target });
+  if (s.jump && s.target !== undefined) out.push({ key: s.jump.name, value: jumpText(s.jump), parts: s.jump.how, mono: true });
   if (s.owner) {
     const d = L[s.owner.kind === "sort" ? "sorts" : s.owner.kind === "term" ? "terms" : "thms"][s.owner.id];
     const at = s.owner.kind === "sort" ? (d as { span?: Span } | undefined)?.span?.start : (d as { entrySpan?: Span } | undefined)?.entrySpan?.start;

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { parseLayout, declName } from "../src/core/layout";
-import { checkPartition, leaves, collectProblems, leafAt, spanChainAt } from "../src/core/spans";
+import { checkPartition, leaves, collectProblems, leafAt, spanChainAt, jumpText } from "../src/core/spans";
 
 const EXAMPLES = join(__dirname, "..", "public", "examples");
 const MM0_TESTS = "/home/graham/Projects/mm0/tests";
@@ -148,7 +148,8 @@ describe("jumps", () => {
     const pTerms = at(16);
     expect(pTerms.kind).toBe("header.p_terms");
     expect(pTerms.target).toBe(Number(L.header!.pTerms));
-    expect(pTerms.jump).toEqual({ name: "term table", how: `0x${L.header!.pTerms.toString(16)} = .value, an absolute file offset` });
+    expect(pTerms.jump?.name).toBe("term table");
+    expect(jumpText(pTerms.jump!)).toBe(`0x${L.header!.pTerms.toString(16)} = .value, an absolute file offset`);
   });
 
   it("statement commands jump to start + data", () => {
@@ -157,7 +158,7 @@ describe("jumps", () => {
     expect(cmd.kind).toBe("proof.stmt_cmd");
     expect(cmd.target).toBe(st.end);
     expect(cmd.jump?.name).toBe("next statement");
-    expect(cmd.jump?.how).toBe(`0x${st.end.toString(16)} = start 0x${st.offset.toString(16)} + .data 0x${(st.end - st.offset).toString(16)}`);
+    expect(jumpText(cmd.jump!)).toBe(`0x${st.end.toString(16)} = start 0x${st.offset.toString(16)} + .data 0x${(st.end - st.offset).toString(16)}`);
   });
 
   it("term references jump to p_terms + 8 × index", () => {
@@ -166,7 +167,9 @@ describe("jumps", () => {
     const cmd = at(thm.unifySpan!.start);
     expect(cmd.kind).toBe("unify.cmd");
     expect(cmd.jump?.name).toBe("term entry");
-    expect(cmd.jump?.how).toMatch(/^0x[0-9a-f]+ = p_terms 0x[0-9a-f]+ \+ 8 × \.data \d+$/);
+    expect(jumpText(cmd.jump!)).toMatch(/^0x[0-9a-f]+ = p_terms 0x[0-9a-f]+ \+ 8 × \.data \d+$/);
     expect(cmd.target).toBe(Number(L.header!.pTerms) + 8 * (cmd.value as { data: number }).data);
+    // The p_terms mention links to the header field.
+    expect(cmd.jump!.how.find((p) => p.text.startsWith("p_terms"))?.link).toBe(16);
   });
 });

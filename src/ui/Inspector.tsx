@@ -1,7 +1,7 @@
 import { createMemo, For, Show } from "solid-js";
 import { hex, type Cmd } from "../core/bytes";
 import { EXPLAIN, PROOF_OP_EXPLAIN, STMT_EXPLAIN, UNIFY_OP_EXPLAIN, type OpExplanation } from "../core/explain";
-import { family, type Problem, type Span, type SpanKind } from "../core/spans";
+import { family, jumpText, type Problem, type Span, type SpanKind } from "../core/spans";
 import { loaded, selectedChain, goTo, history, goBack, problems, scan, selectedOwner, inspTab, setInspTab, type InspTab } from "./state";
 import { describeValue, familyClass, rangeLabel, FAMILY_TITLES } from "./format";
 import { BitView, bitLayoutFor } from "./BitView";
@@ -189,10 +189,27 @@ function FieldTab(props: { span: Span; chain: Span[]; op: OpExplanation | undefi
                 <tr>
                   <th>{l.key}</th>
                   <td class={l.mono ? "mono" : ""}>
-                    <Show when={l.link !== undefined} fallback={l.value}>
-                      <button class="link" onClick={() => goTo(l.link!)}>
-                        {l.value}
-                      </button>
+                    <Show
+                      when={l.parts}
+                      fallback={
+                        <Show when={l.link !== undefined} fallback={l.value}>
+                          <button class="link" onClick={() => goTo(l.link!)}>
+                            {l.value}
+                          </button>
+                        </Show>
+                      }
+                    >
+                      {(parts) => (
+                        <For each={parts()}>
+                          {(p) => (
+                            <Show when={p.link !== undefined} fallback={<span>{p.text}</span>}>
+                              <button class="link" onClick={() => goTo(p.link!)}>
+                                {p.text}
+                              </button>
+                            </Show>
+                          )}
+                        </For>
+                      )}
                     </Show>
                   </td>
                 </tr>
@@ -207,7 +224,7 @@ function FieldTab(props: { span: Span; chain: Span[]; op: OpExplanation | undefi
       <div class="insp-actions">
         <Show when={jump()}>
           {(j) => (
-            <button class="btn small" onClick={() => goTo(props.span.target!)} title={j().how}>
+            <button class="btn small" onClick={() => goTo(props.span.target!)} title={jumpText(j())}>
               {j().name} → {hex(props.span.target!)}
             </button>
           )}

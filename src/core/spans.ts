@@ -104,7 +104,8 @@ export interface Span {
   /**
    * How `target` is computed from this span, for the jump row and button:
    * `name` says what is there ("next statement", "term entry") and `how`
-   * shows the arithmetic ("0x342 = start 0x340 + .data 0x2").
+   * shows the arithmetic ("0x342 = start 0x340 + .data 0x2"), with the
+   * fields it mentions linked to where they live.
    */
   jump?: Jump;
   /** Physical children, sorted by start, contained in [start, end). */
@@ -112,9 +113,20 @@ export interface Span {
   problems?: Problem[];
 }
 
+/** One piece of a jump formula; `link` makes it a link to the field it names. */
+export interface JumpPart {
+  text: string;
+  link?: number;
+}
+
 export interface Jump {
   name: string;
-  how: string;
+  how: JumpPart[];
+}
+
+/** The formula as plain text. */
+export function jumpText(j: Jump): string {
+  return j.how.map((p) => p.text).join("");
 }
 
 export function spanLength(s: Span): number {

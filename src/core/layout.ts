@@ -250,7 +250,7 @@ class Parser {
   absolute(name: string, v: number | bigint): Partial<Span> {
     const n = Number(v);
     if (v === 0n || v === 0 || v > BigInt(this.b.length)) return {};
-    return { target: n, jump: { name, how: `${hex(n)} = .value, an absolute file offset` } };
+    return { target: n, jump: { name, how: [{ text: `${hex(n)} = .value, an absolute file offset` }] } };
   }
 
   /** Convert a u64 pointer to a number, or undefined if it cannot address the file. */
@@ -699,12 +699,13 @@ class Parser {
         const h = this.layout.header;
         if (d && h) {
           span.target = d.start;
+          const data = { text: `.data ${cmd.data}` };
           span.jump =
             info.arg === "term"
-              ? { name: "term entry", how: `${hex(d.start)} = p_terms ${hex(h.pTerms)} + 8 × .data ${cmd.data}` }
+              ? { name: "term entry", how: [{ text: `${hex(d.start)} = ` }, { text: `p_terms ${hex(h.pTerms)}`, link: 16 }, { text: " + 8 × " }, data] }
               : info.arg === "thm"
-                ? { name: "theorem entry", how: `${hex(d.start)} = p_thms ${hex(h.pThms)} + 8 × .data ${cmd.data}` }
-                : { name: "sort entry", how: `${hex(d.start)} = end of header ${hex(HEADER_SIZE)} + .data ${cmd.data}` };
+                ? { name: "theorem entry", how: [{ text: `${hex(d.start)} = ` }, { text: `p_thms ${hex(h.pThms)}`, link: 20 }, { text: " + 8 × " }, data] }
+                : { name: "sort entry", how: [{ text: `${hex(d.start)} = ` }, { text: `end of header ${hex(HEADER_SIZE)}`, link: 0 }, { text: " + " }, data] };
         }
       }
       if (info) this.checkReference(span, info.arg, cmd, avail);
@@ -824,7 +825,7 @@ class Parser {
       stmtSpan.label = `${stmtName} ${decl.id}: ${name}`;
       stmtSpan.owner = decl;
 
-      const cmdSpan: Span = { start: pos, end: pos + cmd.size, kind: "proof.stmt_cmd", label: `${stmtName} (length ${cmd.data})`, value: cmd, owner: decl, target: stmtEnd, jump: { name: "next statement", how: `${hex(stmtEnd)} = start ${hex(pos)} + .data ${hex(cmd.data)}` } };
+      const cmdSpan: Span = { start: pos, end: pos + cmd.size, kind: "proof.stmt_cmd", label: `${stmtName} (length ${cmd.data})`, value: cmd, owner: decl, target: stmtEnd, jump: { name: "next statement", how: [{ text: `${hex(stmtEnd)} = start ${hex(pos)} + .data ${hex(cmd.data)}` }] } };
       const kids = stmtSpan.children as Span[];
       kids.push(cmdSpan);
       const bodyStart = pos + cmd.size;
