@@ -1005,6 +1005,8 @@ class Parser {
 
   parseVarNames(h: Header, start: number, entrySpan: Span): boolean {
     const total = h.numTerms + h.numThms;
+    // A file with no terms and no theorems has an empty table: no bytes to claim.
+    if (total === 0) return true;
     const span: Span = { start, end: start + 8 * total, kind: "varnames", label: "VarN table", children: [] };
     if (!this.claim(span)) return false;
     this.checkAlign(start, 8, "VarN table", entrySpan);
@@ -1033,6 +1035,7 @@ class Parser {
   }
 
   parseHypNames(h: Header, start: number, entrySpan: Span): boolean {
+    if (h.numThms === 0) return true;
     const span: Span = { start, end: start + 8 * h.numThms, kind: "hypnames", label: "HypN table", children: [] };
     if (!this.claim(span)) return false;
     this.checkAlign(start, 8, "HypN table", entrySpan);

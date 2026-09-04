@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { parseLayout } from "../src/core/layout";
 import { checkPartition, collectProblems, leaves } from "../src/core/spans";
 import { MUTANTS, applyMutant } from "../scripts/mutants.mjs";
+import { verifyFile } from "../src/core/verify";
 
 const EXAMPLES = join(__dirname, "..", "public", "examples");
 const base = new Uint8Array(readFileSync(join(EXAMPLES, "tutorial.mmb")));
@@ -23,12 +24,22 @@ describe("mutated files", () => {
       for (const expected of m.expectProblems) {
         expect(messages.some((msg) => msg.includes(expected)), `expected a problem containing "${expected}", got:\n${messages.join("\n")}`).toBe(true);
       }
+      if (m.expectVerify) {
+        const r = verifyFile(L);
+        // The first statement that is not ok must be the one the mutant targets (later ones may fail downstream).
+        const bad = r.results.find((x) => x.status !== "ok");
+        expect(bad && `${bad.index}:${bad.status}`).toBe(`${m.expectVerify.stmt}:${m.expectVerify.status}`);
+        if (m.expectVerify.message) expect(bad!.error?.message).toContain(m.expectVerify.message);
+      }
     });
   }
 
-  it("the unmutated file has no problems at all", () => {
+  it("the unmutated file has no problems at all and verifies", () => {
     const L = parseLayout(base);
     expect(collectProblems(L.root)).toEqual([]);
     expect(L.problems).toEqual([]);
+    const r = verifyFile(L);
+    expect(r.errors).toBe(0);
+    expect(r.sorry).toBe(0);
   });
 });

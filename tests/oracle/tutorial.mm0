@@ -1,0 +1,13 @@
+delimiter $ ( $ $ ) $;
+
+provable sort wff;
+
+term imp: wff > wff > wff;
+term not: wff > wff;
+
+axiom ax_1 (a b: wff): $ imp a (imp b a) $;
+axiom ax_2 (a b c: wff): $ imp (imp a (imp b c)) (imp (imp a b) (imp a c)) $;
+axiom ax_3 (a b: wff): $ imp (imp (not a) (not b)) (imp b a) $;
+axiom ax_mp (a b: wff): $ imp a b $ > $ a $ > $ b $;
+
+theorem id (a: wff): $ imp a a $;

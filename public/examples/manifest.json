@@ -12,7 +12,7 @@
   {
     "file": "dummy_reserved_bit.mmb",
     "title": "Fail case: reserved bit set in arg",
-    "description": "An mm0 test file with no debugging index whose 56th dummy sets the reserved bit of an arg. Verifiers must reject it."
+    "description": "A soundness probe from the mm0 repository: a def with 56 dummies whose value unfolds to the 56th, which then escapes as the axiom `pred choose`. mm0-c masks dependency bit 55 and accepts it; this verifier tracks the bit and rejects the def."
   },
   {
     "file": "gi_header_p_index_overflow.mmb",
@@ -48,6 +48,26 @@
     "file": "mutant_unknown_opcode.mmb",
     "title": "Fail case: unknown opcode",
     "description": "The first command of the proof of `id` is opcode 0x3f, which the spec does not define."
+  },
+  {
+    "file": "mutant_sorry.mmb",
+    "title": "Sorry: admitted proof",
+    "description": "The proof of `id` is replaced by one that builds `imp a a` and admits it with Sorry. The layout is fine and the machine accepts every step, but the statement counts as unverified."
+  },
+  {
+    "file": "mutant_refl_distinct.mmb",
+    "title": "Fail case: Refl on distinct nodes",
+    "description": "The proof of or_right builds `imp b (or a b)` twice, so the conversion obligation has structurally equal but distinct sides. Refl requires the very same node; Save and Ref are the only way to get that."
+  },
+  {
+    "file": "mutant_wrong_conclusion.mmb",
+    "title": "Fail case: proof of a different statement",
+    "description": "The unify stream of mpd now claims the conclusion `imp a b` while the proof establishes `imp a c`. The final unification of the proved statement against the theorem table fails on the last URef. (syl, which applies mpd, then fails too.)"
+  },
+  {
+    "file": "mutant_bad_stack.mmb",
+    "title": "Fail case: wrong kind of stack element",
+    "description": "In the proof of or_right the Conv command is replaced by Refl, which expects a conversion obligation on top of the stack but finds the proof that Thm just pushed."
   },
   {
     "file": "mutant_truncated.mmb",

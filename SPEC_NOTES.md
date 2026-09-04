@@ -31,10 +31,18 @@ text: the tool should describe what files actually contain.
    decides by the `is_def` bit of the term-table entry with the running term
    index, which means the term table must be parsed before the proof stream.
 
-5. **The reserved bit 55 in `arg` is the 56th bound variable.** The test
-   file `dummy_reserved_bit.mmb` has a def with 56 dummies. Its layout is
-   fully well-formed; the rejection happens in the verifier when the 56th
-   `Dummy` command would need dependency bit 55 (Aufbau: `TooManyBoundVars`).
+5. **The 56th bound variable and the reserved bit 55.** The mm0 test file
+   `tests/mmb/run/dummy_reserved_bit` is a soundness probe: a def with 56
+   dummies whose value unfolds to the 56th, `x55`, which then escapes into
+   `axiom seed: $ pred choose $` and lets `theorem bad {x: s}: $ pred x $`
+   be proved. Bit 55 is reserved in the file's `arg` fields, but at run time
+   mm0-c allocates the 56th dummy with bit 55 and then masks the bit away
+   in every dependency check (`TYPE_DEPS_MASK` is 55 bits), so it accepts
+   the file. Aufbau caps bound variables at 55 and rejects the 56th `Dummy`
+   (`TooManyBoundVars`). This tool allows 56 bound variables, like mm0-c,
+   but tracks bit 55 like any other and so rejects the def at the check
+   "value's free variables are declared in ret". The oracle test records the
+   file as a known divergence.
 
 6. **Self-reference is a forward reference.** mm0-c increments its running
    sort/term/theorem counters only after a statement has been verified
@@ -53,3 +61,31 @@ text: the tool should describe what files actually contain.
    `52 00`, `92 00 00`, or `d2 00 00 00 00`. mm0-rs always emits the shortest
    form. The mutant generator uses wider forms to replace a proof body with
    one of exactly the same length without moving anything else in the file.
+
+8. **`Dummy` in a `free` sort.** The spec's `Dummy s` rule only requires
+   `!sort[s].strict`; mm0-c and Aufbau also reject `free` sorts (`free`
+   means "no dummy variables of this sort" in MM0). The verifier here
+   follows the implementations and says so in the check's detail.
+
+9. **`Sorry` on a conversion obligation.** The spec says
+   `Sorry: S, e1 =?= e2 -> S`. mm0-c's `CMD_PROOF_SORRY` pops the top and,
+   when it is not an expression, requires a *conversion* (`STACK_TYPE_CONV`,
+   `e1 = e2`) followed by an expression, which is the layout of `e1 = e2`
+   on its stack, not of an obligation. That looks like a slip; this tool
+   implements the spec (an obligation is dropped). Files using `Sorry` fail
+   verification either way. Aufbau follows the spec too.
+
+10. **`V` versus `FV` in theorem proofs.** The `Thm T` rule in the spec
+    writes its disjointness conditions with `FV`, but mm0-c caches one
+    dependency set per expression, `V(e)` while proving theorems and
+    `FV(e)` while checking def bodies ("`mm0-c` will cache one or the
+    other"), and Aufbau does the same. The machine here computes both sets
+    for every expression and uses the mode's set in the checks, so the
+    debugger can show `V` and `FV` side by side.
+
+11. **Where the running counters are checked.** mm0-c checks
+    `term_id < g_num_terms` (the running count) on every `Term` and
+    `Thm`, and `sort < g_num_sorts` on binders and `Dummy`, so a forward or
+    self reference fails at the command that makes it. The layout parser
+    reports the same condition statically (item 6); the machine reports it
+    again as the failing check when stepping.

@@ -9,13 +9,29 @@
  */
 
 /** @typedef {{ at: number, expect: number[], put: number[] }} Patch */
-/** @typedef {{ file: string, title: string, description: string, patches: Patch[], truncate?: number, expectProblems: string[] }} Mutant */
+/**
+ * @typedef {{ file: string, title: string, description: string, patches: Patch[], truncate?: number,
+ *   expectProblems: string[], expectVerify?: { stmt: number, status: "error" | "sorry", message?: string } }} Mutant
+ * `expectProblems` are layout-level; `expectVerify` is what the stack machine must report
+ * (statement index, and for errors a fragment of the failing check's message).
+ */
 
 // a1i's 25-byte proof body, rewritten to cite a1i itself (theorem 6):
 //   Ref 1; Hyp; Ref 2 (|- h); Ref 0; Ref 1; Ref 0; Ref 1; Term 0; Thm 6; END
 // with wider encodings of Hyp and Ref 0 so the length is unchanged.
 const CIRCULAR_BODY = [0x52, 0x01, 0x96, 0x00, 0x00, 0x52, 0x02, 0xd2, 0, 0, 0, 0, 0x52, 0x01, 0xd2, 0, 0, 0, 0, 0x52, 0x01, 0x10, 0x54, 0x06, 0x00];
 const A1I_BODY = [0x52, 0x01, 0x16, 0x52, 0x01, 0x12, 0x52, 0x01, 0x12, 0x52, 0x01, 0x11, 0x10, 0x14, 0x52, 0x02, 0x52, 0x01, 0x52, 0x03, 0x52, 0x03, 0x54, 0x03, 0x00];
+
+// id's 53-byte proof body replaced by: Ref 0; Ref 0; Term 0; Save ×7; Sorry; END,
+// with wide encodings so the length is unchanged. Proves `imp a a` by Sorry.
+const SORRY_BODY = [0x52, 0x00, 0xd2, 0, 0, 0, 0, 0xd0, 0, 0, 0, 0, ...Array(7).fill([0xdf, 0, 0, 0, 0]).flat(), 0xe0, 0, 0, 0, 0, 0x00];
+const ID_BODY = [0x12, 0x12, 0x51, 0x01, 0x12, 0x11, 0x12, 0x12, 0x52, 0x02, 0x12, 0x11, 0x11, 0x12, 0x52, 0x02, 0x11, 0x12, 0x12, 0x11, 0x11, 0x10, 0x54, 0x01, 0x12, 0x52, 0x02, 0x52, 0x04, 0x14, 0x52, 0x04, 0x52, 0x07, 0x52, 0x07, 0x54, 0x03, 0x12, 0x52, 0x01, 0x52, 0x05, 0x14, 0x52, 0x05, 0x52, 0x06, 0x52, 0x06, 0x54, 0x03, 0x00];
+
+// or_right's 30-byte proof body replaced by one that builds `imp b (or a b)` twice, as two
+// distinct nodes, admits the second by Sorry, and then tries Refl on e1 =?= e2.
+const BUILD = [0x52, 0x01, 0x12, 0x52, 0x01, 0x50, 0x03, 0xd0, 0, 0, 0, 0]; // Ref 1; Ref 0; Ref 1; Term 3 (or); Term 0 (imp)
+const REFL_BODY = [...BUILD, ...BUILD, 0xa0, 0, 0, 0x17, 0x18, 0x00]; // ...; Sorry; Conv; Refl; END
+const OR_RIGHT_BODY = [0x52, 0x01, 0x12, 0x52, 0x01, 0x51, 0x03, 0x11, 0x52, 0x01, 0x12, 0x51, 0x01, 0x52, 0x01, 0x52, 0x04, 0x52, 0x01, 0x11, 0x10, 0x14, 0x17, 0x1a, 0x18, 0x52, 0x05, 0x1b, 0x18, 0x00];
 
 /** @type {Mutant[]} */
 export const MUTANTS = [
@@ -65,6 +81,38 @@ export const MUTANTS = [
     description: "The first command of the proof of `id` is opcode 0x3f, which the spec does not define.",
     patches: [{ at: 897, expect: [0x12], put: [0x3f] }],
     expectProblems: ["unknown opcode 0x3f"],
+  },
+  {
+    file: "mutant_sorry.mmb",
+    title: "Sorry: admitted proof",
+    description: "The proof of `id` is replaced by one that builds `imp a a` and admits it with Sorry. The layout is fine and the machine accepts every step, but the statement counts as unverified.",
+    patches: [{ at: 0x381, expect: ID_BODY, put: SORRY_BODY }],
+    expectProblems: [],
+    expectVerify: { stmt: 7, status: "sorry" },
+  },
+  {
+    file: "mutant_refl_distinct.mmb",
+    title: "Fail case: Refl on distinct nodes",
+    description: "The proof of or_right builds `imp b (or a b)` twice, so the conversion obligation has structurally equal but distinct sides. Refl requires the very same node; Save and Ref are the only way to get that.",
+    patches: [{ at: 0x3cc, expect: OR_RIGHT_BODY, put: REFL_BODY }],
+    expectProblems: [],
+    expectVerify: { stmt: 10, status: "error", message: "both sides are the same node" },
+  },
+  {
+    file: "mutant_wrong_conclusion.mmb",
+    title: "Fail case: proof of a different statement",
+    description: "The unify stream of mpd now claims the conclusion `imp a b` while the proof establishes `imp a c`. The final unification of the proved statement against the theorem table fails on the last URef. (syl, which applies mpd, then fails too.)",
+    patches: [{ at: 0x253, expect: [0x02], put: [0x01] }],
+    expectProblems: [],
+    expectVerify: { stmt: 13, status: "error", message: "top of unify stack is unify heap entry" },
+  },
+  {
+    file: "mutant_bad_stack.mmb",
+    title: "Fail case: wrong kind of stack element",
+    description: "In the proof of or_right the Conv command is replaced by Refl, which expects a conversion obligation on top of the stack but finds the proof that Thm just pushed.",
+    patches: [{ at: 0x3e2, expect: [0x17], put: [0x18] }],
+    expectProblems: [],
+    expectVerify: { stmt: 10, status: "error", message: "expected obligation" },
   },
   {
     file: "mutant_truncated.mmb",
