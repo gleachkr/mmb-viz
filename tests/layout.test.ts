@@ -136,3 +136,37 @@ describe("span partition", () => {
     }
   });
 });
+
+describe("jumps", () => {
+  const L = parseLayout(load("tutorial.mmb"));
+  const at = (offset: number) => {
+    const chain = spanChainAt(L.root, offset);
+    return chain[chain.length - 1]!;
+  };
+
+  it("absolute pointers jump to their value", () => {
+    const pTerms = at(16);
+    expect(pTerms.kind).toBe("header.p_terms");
+    expect(pTerms.target).toBe(Number(L.header!.pTerms));
+    expect(pTerms.jump).toEqual({ name: "term table", how: `0x${L.header!.pTerms.toString(16)} = .value, an absolute file offset` });
+  });
+
+  it("statement commands jump to start + data", () => {
+    const st = L.statements[1]!;
+    const cmd = at(st.offset);
+    expect(cmd.kind).toBe("proof.stmt_cmd");
+    expect(cmd.target).toBe(st.end);
+    expect(cmd.jump?.name).toBe("next statement");
+    expect(cmd.jump?.how).toBe(`0x${st.end.toString(16)} = start 0x${st.offset.toString(16)} + .data 0x${(st.end - st.offset).toString(16)}`);
+  });
+
+  it("term references jump to p_terms + 8 × index", () => {
+    // A theorem's unify stream starts with a UTerm for the head of its conclusion.
+    const thm = L.thms.find((t) => t.unifySpan)!;
+    const cmd = at(thm.unifySpan!.start);
+    expect(cmd.kind).toBe("unify.cmd");
+    expect(cmd.jump?.name).toBe("term entry");
+    expect(cmd.jump?.how).toMatch(/^0x[0-9a-f]+ = p_terms 0x[0-9a-f]+ \+ 8 × \.data \d+$/);
+    expect(cmd.target).toBe(Number(L.header!.pTerms) + 8 * (cmd.value as { data: number }).data);
+  });
+});

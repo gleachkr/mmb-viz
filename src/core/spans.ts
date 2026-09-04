@@ -102,14 +102,19 @@ export interface Span {
   /** For pointer fields: the absolute file offset pointed at (0 = null). */
   target?: number;
   /**
-   * What reaching `target` means, for the jump button: "follow pointer to
-   * the term table" for a real pointer, "look up term 3 (imp) in the term
-   * table" for an index, "skip past this statement" for a length.
+   * How `target` is computed from this span, for the jump row and button:
+   * `name` says what is there ("next statement", "term entry") and `how`
+   * shows the arithmetic ("0x342 = start 0x340 + .data 0x2").
    */
-  jump?: string;
+  jump?: Jump;
   /** Physical children, sorted by start, contained in [start, end). */
   children?: Span[] | (() => Span[]);
   problems?: Problem[];
+}
+
+export interface Jump {
+  name: string;
+  how: string;
 }
 
 export function spanLength(s: Span): number {

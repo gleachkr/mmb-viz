@@ -97,8 +97,7 @@ export function describeValue(s: Span, L: Layout): ValueLine[] {
       const name = table ? table[c.op]?.name : STATEMENTS[c.op]?.name ?? (c.op === 0 ? "END" : undefined);
       out.push({ key: "encoding", value: `${c.size} byte${c.size === 1 ? "" : "s"}: opcode ${hex(first & 0x3f, 2)}${c.dataBytes ? ` + ${c.dataBytes}-byte data` : ", no data"}`, mono: true });
       out.push({ key: "opcode", value: `${hex(c.op, 2)} ${name ?? "(unknown)"}`, mono: true });
-      if (c.dataBytes > 0) out.push({ key: "data", value: `${c.data} (${hex(c.data)})`, mono: true, link: s.target });
-      if (s.kind === "proof.stmt_cmd") out.push({ key: "next statement", value: hex(c.offset + c.data), link: c.offset + c.data, mono: true });
+      if (c.dataBytes > 0) out.push({ key: "data", value: `${c.data} (${hex(c.data)})`, mono: true });
       break;
     }
     case "string":
@@ -106,13 +105,14 @@ export function describeValue(s: Span, L: Layout): ValueLine[] {
       break;
     default:
       if (typeof v === "number") {
-        out.push({ key: "value", value: `${v} (${hex(v)})`, mono: true, link: s.target });
+        out.push({ key: "value", value: `${v} (${hex(v)})`, mono: true });
       } else if (typeof v === "bigint") {
-        out.push({ key: "value", value: `${v} (${hex(v)})`, mono: true, link: s.target });
+        out.push({ key: "value", value: `${v} (${hex(v)})`, mono: true });
       } else if (typeof v === "string") {
         out.push({ key: "value", value: JSON.stringify(v), mono: true });
       }
   }
+  if (s.jump && s.target !== undefined) out.push({ key: s.jump.name, value: s.jump.how, mono: true, link: s.target });
   if (s.owner) {
     const d = L[s.owner.kind === "sort" ? "sorts" : s.owner.kind === "term" ? "terms" : "thms"][s.owner.id];
     const at = s.owner.kind === "sort" ? (d as { span?: Span } | undefined)?.span?.start : (d as { entrySpan?: Span } | undefined)?.entrySpan?.start;

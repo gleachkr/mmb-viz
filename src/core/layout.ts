@@ -246,6 +246,13 @@ class Parser {
     return { start, end: start + size, kind, label, value, ...extra };
   }
 
+  /** Target and jump for an absolute pointer field: the value is the file offset. Null and out-of-range pointers get no jump. */
+  absolute(name: string, v: number | bigint): Partial<Span> {
+    const n = Number(v);
+    if (v === 0n || v === 0 || v > BigInt(this.b.length)) return {};
+    return { target: n, jump: { name, how: `${hex(n)} = .value, an absolute file offset` } };
+  }
+
   /** Convert a u64 pointer to a number, or undefined if it cannot address the file. */
   ptr64(v: bigint, what: string, offset: number, span?: Span): number | undefined {
     if (v > BigInt(this.b.length)) {
@@ -301,14 +308,11 @@ class Parser {
       this.field(6, 2, "header.reserved", "reserved", h.reserved),
       this.field(8, 4, "header.num_terms", "num_terms", h.numTerms),
       this.field(12, 4, "header.num_thms", "num_thms", h.numThms),
-      this.field(16, 4, "header.p_terms", "p_terms", h.pTerms, { target: h.pTerms, jump: "follow pointer to the term table" }),
-      this.field(20, 4, "header.p_thms", "p_thms", h.pThms, { target: h.pThms, jump: "follow pointer to the theorem table" }),
-      this.field(24, 4, "header.p_proof", "p_proof", h.pProof, { target: h.pProof, jump: "follow pointer to the proof stream" }),
+      this.field(16, 4, "header.p_terms", "p_terms", h.pTerms, this.absolute("term table", h.pTerms)),
+      this.field(20, 4, "header.p_thms", "p_thms", h.pThms, this.absolute("theorem table", h.pThms)),
+      this.field(24, 4, "header.p_proof", "p_proof", h.pProof, this.absolute("proof stream", h.pProof)),
       this.field(28, 4, "header.reserved2", "reserved2", h.reserved2),
-      this.field(32, 8, "header.p_index", "p_index", h.pIndex, {
-        target: h.pIndex <= BigInt(b.length) ? Number(h.pIndex) : undefined,
-        jump: "follow pointer to the index",
-      }),
+      this.field(32, 8, "header.p_index", "p_index", h.pIndex, this.absolute("index", h.pIndex)),
     ];
     const span: Span = { start: 0, end: HEADER_SIZE, kind: "header", label: "header", children: kids };
     this.claim(span);
@@ -372,7 +376,7 @@ class Parser {
         this.field(o, 2, "terms.num_args", "num_args", numArgs, { owner: ref }),
         this.field(o + 2, 1, "terms.ret_sort", "ret_sort / is_def", { sort: retSort, isDef }, { owner: ref }),
         this.field(o + 3, 1, "terms.reserved", "reserved", reserved, { owner: ref }),
-        this.field(o + 4, 4, "terms.p_data", "p_data", pData, { owner: ref, target: pData, jump: "follow pointer to this term's binder data (args, ret, unify stream)" }),
+        this.field(o + 4, 4, "terms.p_data", "p_data", pData, { owner: ref, ...this.absolute("binder data", pData) }),
       ];
       const entry: Span = {
         start: o,
@@ -474,7 +478,7 @@ class Parser {
       const fields: Span[] = [
         this.field(o, 2, "thms.num_args", "num_args", numArgs, { owner: ref }),
         this.field(o + 2, 2, "thms.reserved", "reserved", reserved, { owner: ref }),
-        this.field(o + 4, 4, "thms.p_data", "p_data", pData, { owner: ref, target: pData, jump: "follow pointer to this theorem's binder data (args, unify stream)" }),
+        this.field(o + 4, 4, "thms.p_data", "p_data", pData, { owner: ref, ...this.absolute("binder data", pData) }),
       ];
       const entry: Span = {
         start: o,
@@ -691,10 +695,17 @@ class Parser {
       const span: Span = { start: pos, end: pos + cmd.size, kind, label, value: cmd, owner };
       if (!info) addProblem(span, { offset: pos, message: `unknown opcode ${hex(cmd.op)}`, severity: "error" });
       if (info && (info.arg === "term" || info.arg === "thm" || info.arg === "sort")) {
-        const ref: DeclRef = { kind: info.arg, id: cmd.data };
         const d = info.arg === "term" ? this.layout.terms[cmd.data]?.entrySpan : info.arg === "thm" ? this.layout.thms[cmd.data]?.entrySpan : this.layout.sorts[cmd.data]?.span;
-        span.target = d?.start;
-        span.jump = `look up ${info.arg === "thm" ? "theorem" : info.arg} ${cmd.data} (${this.nameOf(ref)}) in the ${info.arg === "thm" ? "theorem" : info.arg} table`;
+        const h = this.layout.header;
+        if (d && h) {
+          span.target = d.start;
+          span.jump =
+            info.arg === "term"
+              ? { name: "term entry", how: `${hex(d.start)} = p_terms ${hex(h.pTerms)} + 8 × .data ${cmd.data}` }
+              : info.arg === "thm"
+                ? { name: "theorem entry", how: `${hex(d.start)} = p_thms ${hex(h.pThms)} + 8 × .data ${cmd.data}` }
+                : { name: "sort entry", how: `${hex(d.start)} = end of header ${hex(HEADER_SIZE)} + .data ${cmd.data}` };
+        }
       }
       if (info) this.checkReference(span, info.arg, cmd, avail);
       out.push(span);
@@ -813,7 +824,7 @@ class Parser {
       stmtSpan.label = `${stmtName} ${decl.id}: ${name}`;
       stmtSpan.owner = decl;
 
-      const cmdSpan: Span = { start: pos, end: pos + cmd.size, kind: "proof.stmt_cmd", label: `${stmtName} (length ${cmd.data})`, value: cmd, owner: decl, target: stmtEnd, jump: "skip past this statement (start + length)" };
+      const cmdSpan: Span = { start: pos, end: pos + cmd.size, kind: "proof.stmt_cmd", label: `${stmtName} (length ${cmd.data})`, value: cmd, owner: decl, target: stmtEnd, jump: { name: "next statement", how: `${hex(stmtEnd)} = start ${hex(pos)} + .data ${hex(cmd.data)}` } };
       const kids = stmtSpan.children as Span[];
       kids.push(cmdSpan);
       const bodyStart = pos + cmd.size;
@@ -913,7 +924,7 @@ class Parser {
       const fields: Span[] = [
         this.field(o, 4, "index.entry_type", "type", type),
         this.field(o + 4, 4, "index.entry_data", "data", data),
-        this.field(o + 8, 8, "index.entry_ptr", "ptr", ptr, { target: ptr <= BigInt(this.b.length) ? Number(ptr) : undefined, jump: `follow pointer to the "${type}" table` }),
+        this.field(o + 8, 8, "index.entry_ptr", "ptr", ptr, this.absolute(`"${type}" data`, ptr)),
       ];
       const span: Span = { start: o, end: o + 16, kind: "index.entry", label: `index entry ${i}: "${type}"${known ? "" : " (unknown)"}`, children: fields };
       kids.push(span);
@@ -961,8 +972,8 @@ class Parser {
         const pProof = this.b.u64(o);
         const pName = this.b.u64(o + 8);
         const fields: Span[] = [
-          this.field(o, 8, "names.p_proof", "proof", pProof, { owner: ref, target: pProof !== 0n && pProof <= BigInt(this.b.length) ? Number(pProof) : undefined, jump: "follow pointer to this declaration's statement in the proof stream" }),
-          this.field(o + 8, 8, "names.p_name", "name", pName, { owner: ref, target: pName !== 0n && pName <= BigInt(this.b.length) ? Number(pName) : undefined, jump: "follow pointer to the name string" }),
+          this.field(o, 8, "names.p_proof", "proof", pProof, { owner: ref, ...this.absolute("statement", pProof) }),
+          this.field(o + 8, 8, "names.p_name", "name", pName, { owner: ref, ...this.absolute("name string", pName) }),
         ];
         const entry: Span = { start: o, end: o + 16, kind: "names.entry", label: `${kind} ${id} name`, owner: ref, children: fields };
         kids.push(entry);
@@ -1003,7 +1014,7 @@ class Parser {
       for (let id = 0; id < n; id++, o += 8) {
         const ref: DeclRef = { kind, id };
         const ptr = this.b.u64(o);
-        const field = this.field(o, 8, "varnames.ptr", `${kind} ${id} variable names`, ptr, { owner: ref, target: ptr !== 0n && ptr <= BigInt(this.b.length) ? Number(ptr) : undefined, jump: "follow pointer to the variable name list" });
+        const field = this.field(o, 8, "varnames.ptr", `${kind} ${id} variable names`, ptr, { owner: ref, ...this.absolute("variable names", ptr) });
         kids.push(field);
         if (ptr === 0n) continue;
         const names = this.parseStrList(ptr, `${kind} ${id} variable names`, field, ref);
@@ -1029,7 +1040,7 @@ class Parser {
       const o = start + 8 * id;
       const ref: DeclRef = { kind: "thm", id };
       const ptr = this.b.u64(o);
-      const field = this.field(o, 8, "hypnames.ptr", `thm ${id} hypothesis names`, ptr, { owner: ref, target: ptr !== 0n && ptr <= BigInt(this.b.length) ? Number(ptr) : undefined, jump: "follow pointer to the hypothesis name list" });
+      const field = this.field(o, 8, "hypnames.ptr", `thm ${id} hypothesis names`, ptr, { owner: ref, ...this.absolute("hypothesis names", ptr) });
       kids.push(field);
       if (ptr === 0n) continue;
       const names = this.parseStrList(ptr, `thm ${id} hypothesis names`, field, ref);
@@ -1069,7 +1080,7 @@ class Parser {
     for (let i = 0; i < count; i++) {
       const o = start + 8 + 8 * i;
       const p = this.b.u64(o);
-      const field = this.field(o, 8, "strlist.ptr", `string ${i}`, p, { owner, target: p !== 0n && p <= BigInt(this.b.length) ? Number(p) : undefined, jump: `follow pointer to string ${i}` });
+      const field = this.field(o, 8, "strlist.ptr", `string ${i}`, p, { owner, ...this.absolute("string", p) });
       kids.push(field);
       const s = p === 0n ? undefined : this.parseString(p, `${what} [${i}]`, field, owner);
       if (s !== undefined) field.label = `string ${i}: ${s}`;

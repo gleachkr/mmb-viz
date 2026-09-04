@@ -177,7 +177,7 @@ function FieldTab(props: { span: Span; chain: Span[]; op: OpExplanation | undefi
   });
   const chainProblems = createMemo<Problem[]>(() => props.chain.flatMap((s) => s.problems ?? []));
   const explain = () => EXPLAIN[props.span.kind];
-  const jump = () => (props.span.target !== undefined && props.span.target > 0 ? props.span.jump ?? "follow pointer" : undefined);
+  const jump = () => (props.span.target !== undefined ? props.span.jump : undefined);
 
   return (
     <>
@@ -206,9 +206,11 @@ function FieldTab(props: { span: Span; chain: Span[]; op: OpExplanation | undefi
 
       <div class="insp-actions">
         <Show when={jump()}>
-          <button class="btn small" onClick={() => goTo(props.span.target!)}>
-            {jump()} → {hex(props.span.target!)}
-          </button>
+          {(j) => (
+            <button class="btn small" onClick={() => goTo(props.span.target!)} title={j().how}>
+              {j().name} → {hex(props.span.target!)}
+            </button>
+          )}
         </Show>
         <Show when={history().length}>
           <button class="btn small" onClick={goBack}>
