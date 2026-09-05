@@ -602,7 +602,9 @@ export class Machine {
           this.say(rec, () => `Heap entry ${data} is a conversion, so Ref discharges the obligation ${this.showEntry(ob)} instead of pushing.`);
         } else {
           this.push(hEntry);
-          this.say(rec, () => `Pushes heap entry ${data}, ${STACK_KIND_TEXT[hEntry.kind]} ${this.showEntry(hEntry)}, on the stack. It is the same node, not a copy.`);
+          this.say(rec, () => {
+            return `Pushes heap entry ${data}, ${STACK_KIND_TEXT[hEntry.kind]} ${this.showEntry(hEntry)}, on the stack. The stack entry is a pointer to the interned expression node #${hEntry.e}, not a copy: Refl and unification compare pointers.`;
+          });
         }
         return;
       }
@@ -883,7 +885,7 @@ export class Machine {
         const e = this.upop();
         const h = u.uheap[data]!.e;
         this.check("top of unify stack is unify heap entry", "Unification", e === h, `heap entry ${data} is #${h} ${this.show(h)}; the stack holds #${e} ${this.show(e)}${e === h ? "" : " (a different node; equality is by identity)"}`);
-        this.say(rec, () => `Matches ${this.show(e)} against unify heap entry ${data}: the same node #${e}.`);
+        this.say(rec, () => `Matches ${this.show(e)} against unify heap entry ${data}: both are pointers to interned node #${e}.`);
         return;
       }
       case 0x30:

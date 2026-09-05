@@ -579,7 +579,7 @@ button { font: inherit; color: inherit; }
 .dbg-stream { font-family: var(--mono); font-size: 11.5px; }
 .dbg-stream-title { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-2); padding: 8px 12px 4px; border-bottom: 1px solid var(--rule); position: sticky; top: 0; background: var(--paper); }
 .dbg-stream.unify .dbg-stream-title { background: var(--unify-t); }
-.dbg-rows { max-height: 320px; overflow: auto; scrollbar-width: none; }
+.dbg-rows { max-height: 320px; overflow: auto; scrollbar-width: none; position: relative; }
 .dbg-rows::-webkit-scrollbar { display: none; }
 .dbg-row { display: flex; align-items: baseline; gap: 8px; padding: 1px 8px 1px 6px; cursor: pointer; white-space: nowrap; overflow: hidden; color: var(--ink-3); }
 .dbg-row:hover { background: var(--paper-2); }
@@ -599,14 +599,20 @@ button { font: inherit; color: inherit; }
 .dbg-panel.stack .dbg-panel-rows { display: flex; flex-direction: column-reverse; }
 .dbg-panel.ustack .dbg-panel-rows { display: flex; flex-direction: column-reverse; }
 .dbg-empty { font-family: var(--mono); font-size: 11.5px; padding: 3px 0; }
-.dbg-srow { display: flex; align-items: baseline; gap: 8px; padding: 2px 4px; border-left: 3px solid transparent; }
+.dbg-srow { display: flex; align-items: baseline; gap: 8px; padding: 2px 4px; border-left: 3px solid transparent; border-top: 1px dotted var(--rule); }
+.dbg-srow:last-child { border-top: none; }
+.dbg-panel.stack .dbg-srow:last-child, .dbg-panel.ustack .dbg-srow:last-child { border-top: 1px dotted var(--rule); }
+.dbg-panel.stack .dbg-srow:first-child, .dbg-panel.ustack .dbg-srow:first-child { border-top: none; }
 .dbg-srow.new { background: #fff3b0; border-left-color: var(--accent); }
-.dbg-srow.top { border-top: 1px solid var(--rule); }
+.dbg-srow.top .dbg-idx { color: var(--ink); font-weight: 700; }
 .dbg-idx { width: 26px; flex: none; text-align: right; font-size: 10px; }
-.dbg-entry { display: inline-flex; gap: 6px; align-items: baseline; min-width: 0; flex-wrap: wrap; }
-.dbg-kind { font-size: 10px; border: 1px solid var(--ink-3); border-radius: 2px; padding: 0 3px; color: var(--ink-2); }
+/* One entry is one run of text: the kind badge, the expression, and the node
+   id flow together and wrap like a sentence, so a long entry still reads as
+   one stack item. */
+.dbg-entry { display: inline; min-width: 0; }
+.dbg-kind { display: inline-block; font-size: 10px; border: 1px solid var(--ink-3); border-radius: 2px; padding: 0 3px; margin-right: 6px; color: var(--ink-2); }
 .dbg-expr { word-break: break-word; }
-.node-id { font-size: 10px; }
+.node-id { font-size: 10px; white-space: nowrap; margin-left: 6px; }
 .dbg-vars { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px; color: var(--ink-2); }
 .dbg-vars .bad { color: var(--accent); font-weight: 700; }
 .dbg-unify { border: 1px solid var(--unify-s); background: rgba(203, 227, 233, 0.35); padding: 6px 8px; display: flex; flex-direction: column; gap: 8px; }

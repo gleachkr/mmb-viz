@@ -162,8 +162,14 @@ function StreamView(props: { title: string; sub?: string; spans: Span[]; execute
     on(
       () => props.executed,
       () => {
-        const el = box?.querySelector(".dbg-row.next, .dbg-row.cur");
-        el?.scrollIntoView({ block: "nearest" });
+        // Scroll only the rows box: scrollIntoView would also scroll the
+        // debugger pane and shift the state panels out of view.
+        const el = box?.querySelector<HTMLElement>(".dbg-row.next, .dbg-row.cur");
+        if (!el) return;
+        const top = el.offsetTop; // .dbg-rows is positioned, so this is box-relative
+        const bottom = top + el.offsetHeight;
+        if (top < box.scrollTop) box.scrollTop = top;
+        else if (bottom > box.scrollTop + box.clientHeight) box.scrollTop = bottom - box.clientHeight;
       },
     ),
   );
@@ -320,7 +326,9 @@ function StatePanels(props: { v: DebugView }) {
         <For each={s().stack}>
           {(e, i) => (
             <div class="dbg-srow" classList={{ new: i() >= s().stack.length - newStack(), top: i() === s().stack.length - 1 }}>
-              <span class="dbg-idx muted">{i() === s().stack.length - 1 ? "top" : ""}</span>
+              <span class="dbg-idx muted" title={i() === s().stack.length - 1 ? "top of the stack" : `stack position ${i()} from the bottom`}>
+                {i() === s().stack.length - 1 ? "top" : i()}
+              </span>
               <EntryText m={m()} e={e} />
             </div>
           )}
@@ -364,7 +372,9 @@ function StatePanels(props: { v: DebugView }) {
               <For each={u().ustack}>
                 {(e, i) => (
                   <div class="dbg-srow" classList={{ new: i() >= u().ustack.length - newUStack(), top: i() === u().ustack.length - 1 }}>
-                    <span class="dbg-idx muted">{i() === u().ustack.length - 1 ? "top" : ""}</span>
+                    <span class="dbg-idx muted" title={i() === u().ustack.length - 1 ? "top of the unify stack" : `position ${i()} from the bottom`}>
+                      {i() === u().ustack.length - 1 ? "top" : i()}
+                    </span>
                     <EntryText m={m()} e={{ kind: "expr", e }} />
                   </div>
                 )}
