@@ -1,6 +1,7 @@
 import { createEffect, createMemo, createRoot, createSignal, For, on, Show } from "solid-js";
 import { hex, hex2, hexOffset } from "../core/bytes";
 import { categoryOf, showStatement, summarize } from "../core/decls";
+import { picture, ruleSchema, type PictureColumn } from "../core/rules";
 import { declName, type Statement } from "../core/layout";
 import { UNIFY_MODE_TEXT, type Check, type ExprNode, type HeapEntry, type Machine, type StackEntry } from "../core/machine";
 import { childrenOf, type Span } from "../core/spans";
@@ -673,11 +674,29 @@ function Narrative(props: { v: DebugView }) {
                 </div>
               )}
             </Show>
-            <Show when={rec().pops.length}>
-              <div class="dbg-line">
-                <span class="dbg-key">popped</span>
-                <For each={rec().pops}>{(e) => <EntryText m={m()} e={e} />}</For>
-              </div>
+            <Show when={ruleSchema(rec())}>
+              {(sch) => (
+                <div class="dbg-rule">
+                  <div class="dbg-rule-row">
+                    <span class="dbg-key">rule</span>
+                    <div class="dbg-rule-lines">
+                      <For each={sch().lines}>{(l) => <div>{l}</div>}</For>
+                    </div>
+                    <span class="dbg-check-section muted" title={sch().paraphrase ? "not one of the spec's displayed rules; paraphrased from this section" : "the rule as the spec displays it, in this section"}>
+                      {sch().section}
+                      {sch().paraphrase ? " ¶" : ""}
+                    </span>
+                  </div>
+                  <div class="dbg-rule-row">
+                    <span class="dbg-key">here</span>
+                    <div class="dbg-rule-pic">
+                      <PictureSide m={m()} cols={picture(rec()).before} />
+                      <span class="dbg-rule-arrow">--&gt;</span>
+                      <PictureSide m={m()} cols={picture(rec()).after} opensAt={picture(rec()).opensAt} />
+                    </div>
+                  </div>
+                </div>
+              )}
             </Show>
             <Show when={rec().checks.length}>
               <div class="dbg-checks">
@@ -722,6 +741,39 @@ function Narrative(props: { v: DebugView }) {
         )}
       </Show>
     </section>
+  );
+}
+
+/** One side of an instantiated rule: the state's letters, each followed by the entries the step removed from or added to it. */
+function PictureSide(props: { m: Machine; cols: PictureColumn[]; opensAt?: number }) {
+  return (
+    <span class="dbg-side">
+      <For each={props.cols}>
+        {(c, i) => (
+          <>
+            <Show when={i() === props.opensAt}>
+              <span class="dbg-rule-unify" title="the unify frame this step opens: its heap is the substitution, its stack the expression to match">unify:</span>
+            </Show>
+            <Show when={i() > 0 && i() !== props.opensAt}>
+              <span class="dbg-sep">{"; "}</span>
+            </Show>
+            <span class="dbg-col" title={c.title}>
+              <span class="dbg-col-name">{c.name}</span>
+              <Show when={c.empty}>
+                <span class="dbg-sep">=</span> .
+              </Show>
+              <For each={c.items}>
+                {(e) => (
+                  <>
+                    <span class="dbg-sep">,</span> <EntryText m={props.m} e={e} />
+                  </>
+                )}
+              </For>
+            </span>
+          </>
+        )}
+      </For>
+    </span>
   );
 }
 

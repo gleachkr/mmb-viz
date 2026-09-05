@@ -132,13 +132,17 @@ export interface StepRecord {
   /** Byte spans consulted, in the order they were read. */
   reads: Span[];
   checks: Check[];
+  /** Main-stack entries this step removed, deepest first (the spec's left-to-right order). */
   pops: StackEntry[];
+  /** Main-stack entries this step added, in push order. */
   pushes: StackEntry[];
   heapPushes: HeapEntry[];
   upops: number[];
   upushes: number[];
   uheapPushes: number[];
   hypPushed?: number;
+  /** A UHyp at the end of a theorem took this hypothesis from the list. */
+  hypPopped?: number;
   /** Node ids allocated by this step. */
   allocated: number[];
   /** One line of prose about what happened. */
@@ -336,7 +340,8 @@ export class Machine {
   private pop(): StackEntry {
     const s = this.stack.pop();
     this.check("stack not empty", "Proof Checking", s !== undefined, s ? "" : "the command needs a stack element but the stack is empty");
-    this.cur.pops.push(s!);
+    // Successive pops reach deeper, so prepend: the record reads bottom to top like the spec's rules.
+    this.cur.pops.unshift(s!);
     return s!;
   }
 
@@ -556,7 +561,7 @@ export class Machine {
         const n = t!.numArgs;
         this.check("stack has the arguments", "Proof Checking", this.stack.length >= n, `${this.termName(data)} takes ${n} argument${n === 1 ? "" : "s"}; the stack has ${this.stack.length} element${this.stack.length === 1 ? "" : "s"}`);
         const argEntries = this.stack.splice(this.stack.length - n, n);
-        rec.pops.push(...argEntries);
+        rec.pops.unshift(...argEntries);
         const args: number[] = [];
         const bvDeps: bigint[] = [];
         let v = 0n;
@@ -640,7 +645,7 @@ export class Machine {
         const n = t!.numArgs;
         this.check("stack has the arguments", "Proof Checking", this.stack.length >= n, `${tname} takes ${n} argument${n === 1 ? "" : "s"}; the stack has ${this.stack.length} element${this.stack.length === 1 ? "" : "s"} below the conclusion`);
         const argEntries = this.stack.splice(this.stack.length - n, n);
-        rec.pops.push(...argEntries);
+        rec.pops.unshift(...argEntries);
         const uheap: { e: number; saved: boolean }[] = [];
         const bvDeps: bigint[] = [];
         argEntries.forEach((s, i) => {
@@ -930,6 +935,7 @@ export class Machine {
           this.check("unify stack is empty before UHyp", "Unification", u.ustack.length === 0, u.ustack.length ? `${u.ustack.length} expression${u.ustack.length === 1 ? "" : "s"} left unmatched: ${u.ustack.map((x) => this.show(x)).join(", ")}` : "");
           this.check("the proof declared a hypothesis for this UHyp", "Unification", this.hyps.length > 0, "the proof's hypothesis list is empty, but the unify stream declares another hypothesis");
           const e = this.hyps.pop()!;
+          rec.hypPopped = e;
           this.upush(e);
           this.say(rec, () => `Takes the last hypothesis the proof declared, \`${this.show(e)}\`; the following unify commands must match it.`);
         }

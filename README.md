@@ -52,7 +52,10 @@ Milestones M0, M1, and M2 are done:
   and (inside a unification) the unify stream with the program counter,
   panels for the stack, heap, hypotheses, unify stack and unify heap with
   changed entries highlighted and node ids visible, and a narrative for
-  each step with its checks and the bytes it read; the hexdump and the
+  each step: the spec's rule for the command (`Term t: H; S, e1, ..., en
+  --> H; S, (t e1 ... en)`) and the same rule filled in with the entries
+  the step actually popped and pushed, then its checks and the bytes it
+  read; the hexdump and the
   debugger follow each other: stepping selects the command's bytes, and
   selecting a proof or unify command in the hexdump moves the machine to
   the step that executes it (opening the owning statement's proof when
@@ -79,8 +82,7 @@ between the hexdump and the debugger; `1`–`4` pick the inspector tab;
 Alt+Left goes back after a jump. In the debugger: `.` step, `,` back, `>`
 step over a unification, `<` back over one, `r` restart, `e` run to the end.
 
-Next (M3): the narrative panel with instantiated spec rules, and the error
-explorer.
+Next (M3): the error explorer.
 
 ## Develop
 
@@ -108,6 +110,7 @@ src/core/     pure TypeScript, no DOM
   spec.ts       spec sections and the markdown renderer
   explain.ts    spec-derived explanations per span kind and opcode
   machine.ts    the stack machine: state, step(), checks, snapshots
+  rules.ts      the spec's rule per command, instantiated from a step record
   verify.ts     traces with keyframes, whole-file verification
 src/ui/       Solid.js components and styling
 public/examples/  bundled .mmb files and their manifest
