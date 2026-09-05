@@ -112,6 +112,8 @@ export interface Check {
   passed: boolean;
   /** Spec section the rule lives in. */
   section: string;
+  /** Spans the step read just before this check, since the previous one: the bytes this check consumed. */
+  reads?: Span[];
 }
 
 export interface VerifyError {
@@ -307,6 +309,11 @@ export class Machine {
     return `{${names.join(", ")}}`;
   }
 
+  /** "depends on {x, y}", or the plain-language form when the bitmap is empty. */
+  depsPhrase(x: bigint): string {
+    return x === 0n ? "has no bound variable dependencies" : `depends on ${this.showDeps(x)}`;
+  }
+
   /** The dependency set the current proof mode tracks: V in theorem proofs, FV in def bodies. */
   deps(n: ExprNode): bigint {
     return this.mode === "def" ? n.fv : n.v;
@@ -320,6 +327,10 @@ export class Machine {
 
   private check(name: string, section: string, passed: boolean, detail: string): void {
     const c: Check = { name, section, passed, detail };
+    if (this.pendingReads.length) {
+      c.reads = this.pendingReads;
+      this.pendingReads = [];
+    }
     this.cur.checks.push(c);
     if (!passed) throw new Fail(`${name}: ${detail}`, c);
   }
@@ -331,8 +342,15 @@ export class Machine {
     if (this.verbose) rec.summary = f();
   }
 
+  /** Spans read since the last check; the next check claims them. */
+  private pendingReads: Span[] = [];
+
   private read(...spans: (Span | undefined)[]): void {
-    for (const s of spans) if (s && !this.cur.reads.includes(s)) this.cur.reads.push(s);
+    for (const s of spans) {
+      if (!s || this.cur.reads.includes(s)) continue;
+      this.cur.reads.push(s);
+      this.pendingReads.push(s);
+    }
   }
 
   // -- stack helpers -----------------------------------------------------------
@@ -414,6 +432,7 @@ export class Machine {
       summary: "",
     };
     this.cur = rec;
+    this.pendingReads = [];
     try {
       if (this.phase === "init") this.stepInit(rec);
       else if (this.unify) this.stepUnify(rec, this.unify);
@@ -478,7 +497,7 @@ export class Machine {
       this.read(ret!.span);
       this.check("return type matches ret_sort", "Term Table", !ret!.bound && ret!.sort === t!.retSort, `ret is ${ret!.bound ? "bound, " : ""}sort ${this.sortName(ret!.sort)}; ret_sort is ${this.sortName(t!.retSort)}`);
       const bvCount = t!.args.filter((a) => a.bound).length;
-      this.check("return deps are declared bound variables", "Term Table", (ret!.deps >> BigInt(bvCount)) === 0n, `ret depends on ${this.showDeps(ret!.deps)}; ${bvCount} bound variables are declared`);
+      this.check("return deps are declared bound variables", "Term Table", (ret!.deps >> BigInt(bvCount)) === 0n, `ret ${this.depsPhrase(ret!.deps)}; ${bvCount} bound variables are declared`);
       const isDef = t!.isDef;
       if (st.hasProof !== isDef) this.check("statement kind matches is_def", "Proof Stream", false, isDef ? "the term table says this is a def, but the statement has no proof body" : "the term table says this is a term, but the statement has a proof body");
       if (!isDef) {
@@ -516,7 +535,7 @@ export class Machine {
         this.nextBv++;
         this.pushHeap({ kind: "expr", e: n.id });
       } else {
-        this.check(`binder ${name}: deps are earlier bound variables`, "Term Table", (a.deps >> BigInt(this.nextBv)) === 0n, `${name} depends on ${this.showDeps(a.deps)}; ${this.nextBv} bound variables precede it`);
+        this.check(`binder ${name}: deps are earlier bound variables`, "Term Table", (a.deps >> BigInt(this.nextBv)) === 0n, `${name} ${this.depsPhrase(a.deps)}; ${this.nextBv} bound variables precede it`);
         const n = this.alloc({ kind: "var", sort: a.sort, bound: false, v: a.deps, fv: a.deps, name, index: i });
         this.pushHeap({ kind: "expr", e: n.id });
       }

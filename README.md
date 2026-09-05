@@ -54,8 +54,8 @@ Milestones M0, M1, and M2 are done:
   changed entries highlighted and node ids visible, and a narrative for
   each step: the spec's rule for the command (`Term t: H; S, e1, ..., en
   --> H; S, (t e1 ... en)`) and the same rule filled in with the entries
-  the step actually popped and pushed, then its checks and the bytes it
-  read; the hexdump and the
+  the step actually popped and pushed, then its checks in order, each
+  preceded by the bytes it consulted; the hexdump and the
   debugger follow each other: stepping selects the command's bytes, and
   selecting a proof or unify command in the hexdump moves the machine to
   the step that executes it (opening the owning statement's proof when

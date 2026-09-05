@@ -668,7 +668,6 @@ button { font: inherit; color: inherit; }
 .dbg-summary { margin: 6px 0 8px; }
 .dbg-summary code { font-size: 12px; background: rgba(30, 26, 22, 0.06); padding: 0 3px; border-radius: 2px; }
 .dbg-error { margin: 0 0 8px; }
-.dbg-line { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; margin: 4px 0; font-family: var(--mono); font-size: 12px; }
 .dbg-key { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); width: 48px; flex: none; }
 .dbg-reads { display: flex; flex-wrap: wrap; gap: 4px; font-size: 11px; }
 .dbg-rule { margin: 6px 0 8px; padding: 6px 8px; background: #fbf8f1; border: 1px solid var(--rule); font-family: var(--mono); font-size: 12px; }
@@ -688,7 +687,10 @@ button { font: inherit; color: inherit; }
 .dbg-check.failed .dbg-check-mark, .dbg-check.failed .dbg-check-name { color: var(--accent); font-weight: 700; }
 .dbg-check.failed .dbg-check-detail { color: var(--ink); }
 .dbg-check-detail { font-size: 12px; }
-.dbg-check-section { font-family: var(--mono); font-size: 10px; white-space: nowrap; }
+.dbg-check-section { font-family: var(--mono); font-size: 10px; white-space: nowrap; text-align: right; }
+.dbg-read { align-items: center; }
+.dbg-read .dbg-key { width: auto; }
+.dbg-read .dbg-reads { padding: 1px 0; }
 
 /* pc and reads in the hexdump */
 .hex-cell.pc, .ascii-cell.pc { box-shadow: inset 0 0 0 2px var(--accent); }

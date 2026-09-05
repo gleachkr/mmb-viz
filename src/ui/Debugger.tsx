@@ -642,8 +642,24 @@ function Narrative(props: { v: DebugView }) {
   const r = () => props.v.record;
   const m = () => props.v.m;
   const failed = (c: Check) => !c.passed;
-  // What the step consulted besides its own bytes, which the title already names.
-  const consulted = () => r()?.reads.filter((s) => s !== r()!.span) ?? [];
+  // The step's checks in order, each preceded by the bytes it consulted, then whatever
+  // the step read after its last check. The command's own bytes are left out: the title names them.
+  const trace = () => {
+    const rec = r();
+    if (!rec) return [];
+    const own = (s: Span) => s !== rec.span;
+    const items: ({ kind: "read"; spans: Span[] } | { kind: "check"; check: Check })[] = [];
+    const claimed = new Set<Span>();
+    for (const c of rec.checks) {
+      const spans = (c.reads ?? []).filter(own);
+      spans.forEach((s) => claimed.add(s));
+      if (spans.length) items.push({ kind: "read", spans });
+      items.push({ kind: "check", check: c });
+    }
+    const rest = rec.reads.filter((s) => own(s) && !claimed.has(s));
+    if (rest.length) items.push({ kind: "read", spans: rest });
+    return items;
+  };
   return (
     <section class="dbg-narrative">
       <Show
@@ -698,43 +714,46 @@ function Narrative(props: { v: DebugView }) {
                 </div>
               )}
             </Show>
-            <Show when={rec().checks.length}>
+            <Show when={trace().length}>
               <div class="dbg-checks">
-                <For each={rec().checks}>
-                  {(c) => (
-                    <div class="dbg-check" classList={{ failed: failed(c) }}>
-                      <span class="dbg-check-mark">{c.passed ? "✓" : "✗"}</span>
-                      <span class="dbg-check-name">{c.name}</span>
-                      <Show when={c.detail}>
+                <For each={trace()}>
+                  {(it) =>
+                    it.kind === "check" ? (
+                      <div class="dbg-check" classList={{ failed: failed(it.check) }}>
+                        <span class="dbg-check-mark">{it.check.passed ? "✓" : "✗"}</span>
+                        <span class="dbg-check-name">{it.check.name}</span>
                         <span class="dbg-check-detail muted">
-                          <NodeText text={c.detail} />
+                          <Show when={it.check.detail}>
+                            <NodeText text={it.check.detail} />
+                          </Show>
                         </span>
-                      </Show>
-                      <span class="dbg-check-section muted">{c.section}</span>
-                    </div>
-                  )}
+                        <span class="dbg-check-section muted">{it.check.section}</span>
+                      </div>
+                    ) : (
+                      <div class="dbg-check dbg-read" title="bytes the step consulted at this point; the checks below use them">
+                        <span class="dbg-check-mark" />
+                        <span class="dbg-check-name dbg-key">read</span>
+                        <span class="dbg-reads">
+                          <For each={it.spans}>
+                            {(s) => (
+                              <button
+                                class={`crumb link ${familyClass(s)}`}
+                                onClick={() => {
+                                  goTo(s.start);
+                                  setCenterTab("hex");
+                                }}
+                                title={`${s.kind} at ${hex(s.start)}: show in the hexdump`}
+                              >
+                                {s.label} <span class="mono">{hex(s.start)}</span>
+                              </button>
+                            )}
+                          </For>
+                        </span>
+                        <span />
+                      </div>
+                    )
+                  }
                 </For>
-              </div>
-            </Show>
-            <Show when={consulted().length}>
-              <div class="dbg-line">
-                <span class="dbg-key">read</span>
-                <span class="dbg-reads">
-                  <For each={consulted()}>
-                    {(s) => (
-                      <button
-                        class={`crumb link ${familyClass(s)}`}
-                        onClick={() => {
-                          goTo(s.start);
-                          setCenterTab("hex");
-                        }}
-                        title={`${s.kind} at ${hex(s.start)}: show in the hexdump`}
-                      >
-                        {s.label} <span class="mono">{hex(s.start)}</span>
-                      </button>
-                    )}
-                  </For>
-                </span>
               </div>
             </Show>
           </>
