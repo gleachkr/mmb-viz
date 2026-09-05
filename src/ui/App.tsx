@@ -6,7 +6,7 @@ import { StructureTree } from "./StructureTree";
 import { Declarations } from "./Declarations";
 import { Inspector } from "./Inspector";
 import { Debugger } from "./Debugger";
-import { loaded, loadBytes, loadExample, goBack, showTree, showInspector, toggleTree, toggleInspector, leftTab, setLeftTab, setInspTab, centerTab, setCenterTab, debug, debugGoto, debugStep, debugStepOver, debugStepBackOver, verification } from "./state";
+import { loaded, loadBytes, loadExample, startRouting, goBack, showTree, showInspector, toggleTree, toggleInspector, leftTab, setLeftTab, setInspTab, centerTab, setCenterTab, debug, debugGoto, debugStep, debugStepOver, debugStepBackOver, verification } from "./state";
 
 export function App() {
   onMount(() => {
@@ -47,9 +47,7 @@ export function App() {
         if (e.key === "e" || e.key === "End") debugGoto(debug()!.trace.length);
       }
     });
-    const params = new URLSearchParams(location.hash.replace(/^#/, ""));
-    const ex = params.get("example");
-    if (ex) void loadExample(ex);
+    startRouting();
   });
 
   return (

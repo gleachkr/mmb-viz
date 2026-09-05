@@ -1,16 +1,18 @@
-import { createEffect, createMemo, createRoot, createSignal, on } from "solid-js";
+import { batch, createEffect, createMemo, createRoot, createSignal, on } from "solid-js";
 import { parseLayout, type Layout } from "../core/layout";
 import { allDecls, type DeclSummary } from "../core/decls";
 import { collectProblems, spanChainAt, type DeclRef, type Problem, type Span } from "../core/spans";
 import { disassembleProof } from "../core/streams";
 import { type Machine, type Snapshot, type StepRecord } from "../core/machine";
 import { Trace, verifyStatement, type StatementResult } from "../core/verify";
-import { type Statement } from "../core/layout";
+import { declName, type Statement } from "../core/layout";
 
 export interface Loaded {
   name: string;
   layout: Layout;
   parseMs: number;
+  /** The bundled example this file is, when it is one: the only kind a URL can reload. */
+  example?: string;
 }
 
 const [loaded, setLoaded] = createSignal<Loaded | undefined>();
@@ -20,9 +22,10 @@ const [selected, setSelected] = createSignal<number>(-1);
 const [hovered, setHovered] = createSignal<number>(-1);
 /** Version counter bumped whenever something asks the hexdump to scroll. */
 const [scrollRequest, setScrollRequest] = createSignal<{ offset: number; n: number }>({ offset: 0, n: 0 });
-const [history, setHistory] = createSignal<number[]>([]);
+/** Whether a jump has been made that the back button can undo (browser history entries this page pushed). */
+const [canGoBack, setCanGoBack] = createSignal(false);
 
-export { loaded, selected, hovered, scrollRequest, history };
+export { loaded, selected, hovered, scrollRequest, canGoBack };
 
 /** Side panes start hidden on viewports too narrow to show them beside the hexdump. */
 const w = typeof window === "undefined" ? 1600 : window.innerWidth;
@@ -86,18 +89,19 @@ export function problems(): Problem[] {
   return scan()?.problems ?? loaded()?.layout.problems ?? [];
 }
 
-export function loadBytes(name: string, bytes: Uint8Array): void {
+export function loadBytes(name: string, bytes: Uint8Array, example?: string): void {
   const t0 = performance.now();
   const layout = parseLayout(bytes);
   const parseMs = performance.now() - t0;
-  setHistory([]);
-  setSelected(-1);
-  setHovered(-1);
-  setScan(undefined);
-  setDebug(undefined);
-  setCenterTab("hex");
-  resetVerification(layout);
-  setLoaded({ name, layout, parseMs });
+  batch(() => {
+    setSelected(-1);
+    setHovered(-1);
+    setScan(undefined);
+    setDebug(undefined);
+    setCenterTab("hex");
+    resetVerification(layout);
+    setLoaded({ name, layout, parseMs, example });
+  });
   // Let the first paint happen, then decode everything, then verify everything.
   setTimeout(() => {
     if (loaded()?.layout !== layout) return;
@@ -376,31 +380,32 @@ export function goToDecl(ref: DeclRef): void {
   setInspTab("decl");
 }
 
-export async function loadExample(file: string): Promise<void> {
+/** Fetch and load a bundled example. Opening one is a jump the back button can undo, unless `push` is false. */
+export async function loadExample(file: string, push = true): Promise<void> {
   const url = new URL(`examples/${file}`, document.baseURI);
   const res = await fetch(url);
   if (!res.ok) throw new Error(`failed to fetch ${file}: ${res.status}`);
-  loadBytes(file, new Uint8Array(await res.arrayBuffer()));
+  if (push) pushNext = true;
+  loadBytes(file, new Uint8Array(await res.arrayBuffer()), file);
 }
 
-/** Select an offset and bring it into view. */
+/**
+ * Select an offset and bring it into view. A jump (the default) leaves the
+ * previous location in the browser history, so back returns to it; stepping
+ * and plain clicks pass `pushHistory = false` and only update the current entry.
+ */
 export function goTo(offset: number, pushHistory = true): void {
   const L = loaded()?.layout;
   if (!L) return;
   if (offset < 0 || offset >= L.bytes.length) return;
-  if (pushHistory && selected() >= 0 && selected() !== offset) {
-    setHistory((h) => [...h.slice(-49), selected()]);
-  }
+  if (pushHistory && selected() >= 0 && selected() !== offset) pushNext = true;
   setSelected(offset);
   setScrollRequest((r) => ({ offset, n: r.n + 1 }));
 }
 
+/** Return to the location before the last jump (the browser's own back). */
 export function goBack(): void {
-  const h = history();
-  const last = h[h.length - 1];
-  if (last === undefined) return;
-  setHistory(h.slice(0, -1));
-  goTo(last, false);
+  if (canGoBack()) history.back();
 }
 
 export function select(offset: number): void {
@@ -438,3 +443,136 @@ export const selectedOwner: () => DeclRef | undefined = createRoot(() =>
     { equals: (a, b) => a?.kind === b?.kind && a?.id === b?.id },
   ),
 );
+
+// ---------------------------------------------------------------------------
+// Routing: the location is mirrored into the URL hash, so that the browser's
+// back button undoes jumps, a reload keeps the place, and a URL can be shared.
+// Jumps push a history entry; stepping and selecting only update the current one.
+
+/** Where the user is: enough to restore the view, and to name it in a URL. */
+export interface Location {
+  /** Bundled example file, when the loaded file is one. */
+  example?: string;
+  /** Selected byte offset. */
+  at?: number;
+  /** Which center pane is showing; absent means the hexdump. */
+  view?: CenterTab;
+  /** The statement open in the debugger, by its declaration's name (or `#index`). */
+  stmt?: string;
+  /** The debugger's position within that statement's proof. */
+  step?: number;
+}
+
+/** Depth of the history entry this page is on, kept in `history.state` to know whether back stays on the page. */
+interface RouteState {
+  mmb: number;
+}
+
+/** Set by a jump: the next hash update pushes a history entry instead of replacing the current one. */
+let pushNext = false;
+
+export function currentLocation(): Location {
+  const l = loaded();
+  if (!l) return {};
+  const loc: Location = { example: l.example };
+  if (selected() >= 0) loc.at = selected();
+  if (centerTab() === "debug") loc.view = "debug";
+  const d = debug();
+  if (d && d.trace.L === l.layout) {
+    loc.stmt = d.trace.stmt.decl ? declName(l.layout, d.trace.stmt.decl) : `#${d.trace.stmt.index}`;
+    loc.step = d.step;
+  }
+  return loc;
+}
+
+/** The URL hash for a location: `#example=peano.mmb&at=0x40&view=debug&stmt=ax_mp&step=17`. */
+export function formatLocation(loc: Location): string {
+  const p = new URLSearchParams();
+  if (loc.example) p.set("example", loc.example);
+  if (loc.at !== undefined) p.set("at", `0x${loc.at.toString(16)}`);
+  if (loc.view === "debug") p.set("view", "debug");
+  if (loc.stmt !== undefined) p.set("stmt", loc.stmt);
+  if (loc.step !== undefined) p.set("step", String(loc.step));
+  const q = p.toString();
+  return q ? `#${q}` : "";
+}
+
+export function parseLocation(hash: string): Location {
+  const p = new URLSearchParams(hash.replace(/^#/, ""));
+  const loc: Location = {};
+  const ex = p.get("example");
+  if (ex) loc.example = ex;
+  const at = p.get("at");
+  if (at !== null && /^(0x[0-9a-f]+|\d+)$/i.test(at)) loc.at = Number(at);
+  if (p.get("view") === "debug") loc.view = "debug";
+  const stmt = p.get("stmt");
+  if (stmt) loc.stmt = stmt;
+  const step = p.get("step");
+  if (step !== null && /^\d+$/.test(step)) loc.step = Number(step);
+  return loc;
+}
+
+/** The statement a URL names: by declaration name, or `#index`; a proof is preferred when names collide. */
+function statementNamed(L: Layout, name: string): Statement | undefined {
+  if (/^#\d+$/.test(name)) return L.statements[Number(name.slice(1))];
+  const named = L.statements.filter((s) => s.decl && declName(L, s.decl) === name);
+  return named.find((s) => s.hasProof) ?? named[0];
+}
+
+/** Restore a location in the loaded file; the file itself must already be loaded. */
+function applyLocation(loc: Location): void {
+  const l = loaded();
+  if (!l) return;
+  batch(() => {
+    const st = loc.stmt !== undefined ? statementNamed(l.layout, loc.stmt) : undefined;
+    if (st) openDebugger(st, loc.step ?? 0);
+    setCenterTab(loc.view === "debug" && st ? "debug" : "hex");
+    if (loc.at !== undefined && loc.at < l.layout.bytes.length) goTo(loc.at, false);
+    else setSelected(-1);
+  });
+}
+
+function depth(): number {
+  const st = history.state as RouteState | null;
+  return typeof st?.mmb === "number" ? st.mmb : 0;
+}
+
+/** Write the current location to the URL, pushing an entry when a jump asked for one. */
+function syncHash(): void {
+  const hash = formatLocation(currentLocation());
+  const push = pushNext;
+  pushNext = false;
+  if (hash === location.hash) return;
+  const url = hash || location.pathname + location.search;
+  if (push) {
+    history.pushState({ mmb: depth() + 1 } satisfies RouteState, "", url);
+    setCanGoBack(true);
+  } else {
+    history.replaceState({ mmb: depth() } satisfies RouteState, "", url);
+  }
+}
+
+/** Bring the app to the location in the URL, loading the example it names when that is not the loaded file. */
+async function followHash(): Promise<void> {
+  const loc = parseLocation(location.hash);
+  if (loc.example && loc.example !== loaded()?.example) {
+    await loadExample(loc.example, false);
+    if (loaded()?.example !== loc.example) return;
+  }
+  applyLocation(loc);
+}
+
+/**
+ * Start mirroring the location into the URL hash and following the browser's
+ * back and forward buttons. Loads the example the URL names, if any.
+ */
+export function startRouting(): void {
+  if (history.state === null) history.replaceState({ mmb: 0 } satisfies RouteState, "", location.href);
+  setCanGoBack(depth() > 0);
+  window.addEventListener("popstate", () => {
+    setCanGoBack(depth() > 0);
+    void followHash();
+  });
+  createRoot(() => createEffect(on([loaded, selected, centerTab, debug], syncHash, { defer: true })));
+  void followHash();
+}

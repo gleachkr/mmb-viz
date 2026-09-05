@@ -274,6 +274,9 @@ anchor). Rendered from markdown at build time.
 ### 3.9 Extras (in rough priority order)
 
 - Shareable URLs: `#example=peano&stmt=ax_mp&step=17` for bundled files.
+  Done: the hash mirrors the location (example, offset, pane, statement,
+  step) and jumps push history entries, so the browser's back button also
+  undoes navigation inside the page.
 - What-if editing: flip a byte or edit a field in the hexdump, re-parse and
   re-verify, and see what breaks. Cheap once parsing is fast, and very
   instructive.

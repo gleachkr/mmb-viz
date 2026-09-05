@@ -2,7 +2,7 @@ import { createMemo, For, Show } from "solid-js";
 import { hex, type Cmd } from "../core/bytes";
 import { EXPLAIN, PROOF_OP_EXPLAIN, STMT_EXPLAIN, UNIFY_OP_EXPLAIN, type OpExplanation } from "../core/explain";
 import { family, jumpText, type Problem, type Span, type SpanKind } from "../core/spans";
-import { loaded, selectedChain, goTo, history, goBack, problems, scan, selectedOwner, inspTab, setInspTab, type InspTab, debugOffset, setCenterTab, verification, openDebugger } from "./state";
+import { loaded, selectedChain, goTo, canGoBack, goBack, problems, scan, selectedOwner, inspTab, setInspTab, type InspTab, debugOffset, setCenterTab, verification, openDebugger } from "./state";
 import { describeValue, familyClass, rangeLabel, FAMILY_TITLES } from "./format";
 import { BitView, bitLayoutFor } from "./BitView";
 import { DeclCard } from "./DeclCard";
@@ -229,7 +229,7 @@ function FieldTab(props: { span: Span; chain: Span[]; op: OpExplanation | undefi
             </button>
           )}
         </Show>
-        <Show when={history().length}>
+        <Show when={canGoBack()}>
           <button class="btn small" onClick={goBack}>
             ← back
           </button>

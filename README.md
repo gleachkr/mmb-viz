@@ -66,6 +66,14 @@ Milestones M0, M1, and M2 are done:
   that made it, and everything pointing at it), and hovering any `#N`
   anywhere in the debugger lights up every pointer to that node and every
   larger node containing it; clicking pins it;
+- the location lives in the URL hash
+  (`#example=peano.mmb&at=0x40&view=debug&stmt=ax_mp&step=17`): jumps
+  (crumbs, links, declaration rows, opening an example) push a browser
+  history entry, so the back button and Alt+Left return to the previous
+  pane, selection, and debugger step; stepping and plain clicks only update
+  the current entry; a URL naming a bundled example reloads that exact
+  place, and a reload keeps it (for a dropped file the URL still holds the
+  position, but not the file);
 - tests against mm0-c as an oracle (`tests/oracle.test.ts`): accept/reject
   and the failing statement must agree on the tutorial, its mutants, peano,
   and the mm0 repository's run tests; known divergences are listed there
@@ -79,7 +87,7 @@ Keyboard: `[` and `]` toggle the structure tree and inspector panes (they
 start hidden on narrow viewports); `d` switches the left pane between the
 structure tree and the declarations browser; `v` switches the center pane
 between the hexdump and the debugger; `1`–`4` pick the inspector tab;
-Alt+Left goes back after a jump. In the debugger: `.` step, `,` back, `>`
+Alt+Left goes back after a jump (so does the browser's back button). In the debugger: `.` step, `,` back, `>`
 step over a unification, `<` back over one, `r` restart, `e` run to the end.
 
 Next (M3): the error explorer.

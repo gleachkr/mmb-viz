@@ -1,5 +1,5 @@
 import { createResource, For, Show } from "solid-js";
-import { loaded, loadBytes, loadExample, goBack, history, showTree, showInspector, toggleTree, toggleInspector, problems, scan, verification, showProblemsTab } from "./state";
+import { loaded, loadBytes, loadExample, goBack, canGoBack, showTree, showInspector, toggleTree, toggleInspector, problems, scan, verification, showProblemsTab } from "./state";
 import { bytesLabel } from "./format";
 
 interface ExampleMeta {
@@ -47,7 +47,7 @@ export function TopBar() {
           <option value="">Examples…</option>
           <For each={examples() ?? []}>{(ex) => <option value={ex.file} title={ex.description}>{ex.title}</option>}</For>
         </select>
-        <button class="btn" disabled={history().length === 0} onClick={goBack} title="Back (Alt+Left)">
+        <button class="btn" disabled={!canGoBack()} onClick={goBack} title="Back (Alt+Left)">
           ← back
         </button>
       </div>

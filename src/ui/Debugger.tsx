@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createRoot, createSignal, For, on, Show } from "solid-js";
+import { batch, createEffect, createMemo, createRoot, createSignal, For, on, Show } from "solid-js";
 import { hex, hex2, hexOffset } from "../core/bytes";
 import { categoryOf, showStatement, summarize } from "../core/decls";
 import { picture, ruleSchema, type PictureColumn } from "../core/rules";
@@ -738,10 +738,12 @@ function Narrative(props: { v: DebugView }) {
                             {(s) => (
                               <button
                                 class={`crumb link ${familyClass(s)}`}
-                                onClick={() => {
-                                  goTo(s.start);
-                                  setCenterTab("hex");
-                                }}
+                                onClick={() =>
+                                  batch(() => {
+                                    goTo(s.start);
+                                    setCenterTab("hex");
+                                  })
+                                }
                                 title={`${s.kind} at ${hex(s.start)}: show in the hexdump`}
                               >
                                 {s.label} <span class="mono">{hex(s.start)}</span>
