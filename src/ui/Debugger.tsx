@@ -6,7 +6,7 @@ import { UNIFY_MODE_TEXT, type Check, type HeapEntry, type Machine, type StackEn
 import { childrenOf, type Span } from "../core/spans";
 import { CATEGORY_CLASS } from "./DeclCard";
 import { familyClass } from "./format";
-import { debugGoto, debugStep, debugStepBackOver, debugStepOver, debugView, stepBackOverTarget, stepOverTarget, goTo, loaded, openDebugger, reveal, setCenterTab, setInspTab, type DebugView } from "./state";
+import { debugGoto, debugStep, debugStepBackOver, debugStepOver, debugView, stepBackOverTarget, stepOverTarget, goTo, loaded, openDebugger, reveal, setCenterTab, type DebugView } from "./state";
 
 const KIND_MARK: Record<StackEntry["kind"], string> = { expr: "", proof: "|-", conv: "=", coconv: "=?=" };
 
@@ -409,6 +409,8 @@ function Narrative(props: { v: DebugView }) {
   const r = () => props.v.record;
   const m = () => props.v.m;
   const failed = (c: Check) => !c.passed;
+  // What the step consulted besides its own bytes, which the title already names.
+  const consulted = () => r()?.reads.filter((s) => s !== r()!.span) ?? [];
   return (
     <section class="dbg-narrative">
       <Show
@@ -427,12 +429,7 @@ function Narrative(props: { v: DebugView }) {
               <span class="dbg-step-n mono">step {rec().index + 1}</span>
               <span class={`dbg-level ${rec().level}`}>{rec().level === "stmt" ? "statement" : rec().level === "unify" ? "unify" : "proof"}</span>
               <span class="dbg-mnemonic mono">{rec().mnemonic}</span>
-              <button class="link small" onClick={() => goTo(rec().span.start)} title="select these bytes">
-                {hex(rec().span.start)}
-              </button>
-              <button class="link small" onClick={() => setInspTab("spec")} title="show the spec rule in the inspector">
-                spec
-              </button>
+              <span class="dbg-step-at mono muted">{hex(rec().span.start)}</span>
             </div>
             <p class="dbg-summary">{rec().summary}</p>
             <Show when={rec().error}>
@@ -464,11 +461,11 @@ function Narrative(props: { v: DebugView }) {
                 </For>
               </div>
             </Show>
-            <Show when={rec().reads.length}>
+            <Show when={consulted().length}>
               <div class="dbg-line">
                 <span class="dbg-key">read</span>
                 <span class="dbg-reads">
-                  <For each={rec().reads}>
+                  <For each={consulted()}>
                     {(s) => (
                       <button
                         class={`crumb link ${familyClass(s)}`}
