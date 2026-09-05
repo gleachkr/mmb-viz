@@ -74,7 +74,7 @@ describe("instantiated rules", () => {
   });
 
   it("END of a theorem application: the unify stack is empty and the conclusion is pushed", () => {
-    const r = at((x) => x.level === "unify" && x.closes && x.pushes[0]?.kind === "proof");
+    const r = at((x) => x.level === "unify" && !!x.closes && x.pushes[0]?.kind === "proof");
     expect(ruleSchema(r)?.lines[0]).toBe("END: S = . --> MS, |- e");
     const p = pic(r);
     expect(p.before).toBe("H; S = .");
