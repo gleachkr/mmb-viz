@@ -211,49 +211,55 @@ export function debugStep(delta: number): void {
 }
 
 /**
- * The step that "step over" would land on from `step`, or undefined when the
- * next command does not open a unification (so stepping over would be no
- * different from stepping).
+ * Index of the record that opened the unify frame open at `step`, or -1 when
+ * no unification is in progress there. Scans back matching ENDs to openers.
  */
-export function stepOverTarget(recs: readonly StepRecord[], step: number): number | undefined {
-  const next = recs[step];
-  if (!next?.opens) return undefined;
-  // Run until the frame this step opened is closed.
-  let k = step + 1;
-  let depth = 1;
-  while (k < recs.length && depth > 0) {
+export function frameOpener(recs: readonly StepRecord[], step: number): number {
+  let depth = 0;
+  for (let k = step - 1; k >= 0; k--) {
+    const r = recs[k]!;
+    if (r.closes) depth++;
+    if (r.opens) {
+      if (depth === 0) return k;
+      depth--;
+    }
+  }
+  return -1;
+}
+
+/** The step just after the END that closes the frame opened at record `opener` (or the end of the trace). */
+function frameEnd(recs: readonly StepRecord[], opener: number): number {
+  let depth = 0;
+  let k = opener;
+  do {
     const r = recs[k]!;
     if (r.opens) depth++;
     if (r.closes) depth--;
     k++;
-  }
+  } while (k < recs.length && depth > 0);
   return k;
 }
 
 /**
+ * The step that "step over" would land on from `step`: past the unification
+ * the next command opens, or past the one currently open. Undefined when
+ * neither applies, so stepping over would be no different from stepping.
+ */
+export function stepOverTarget(recs: readonly StepRecord[], step: number): number | undefined {
+  if (recs[step]?.opens) return frameEnd(recs, step);
+  const opener = frameOpener(recs, step);
+  return opener >= 0 ? frameEnd(recs, opener) : undefined;
+}
+
+/**
  * The step that "back over" would land on from `step`: just before the
- * unification the last step is inside of or just closed. Undefined when the
- * last step is not part of a unification.
+ * unification currently open, or the one the last step closed. Undefined
+ * when the last step is not part of a unification.
  */
 export function stepBackOverTarget(recs: readonly StepRecord[], step: number): number | undefined {
   if (step === 0) return undefined;
-  let k = step - 1;
-  const last = recs[k]!;
-  // Just after the opener the frame is open but nothing has run inside it yet:
-  // leaving it backwards is one step.
-  if (last.opens && !last.closes) return k;
-  if (last.level !== "unify" && !last.closes) return undefined;
-  let depth = last.closes ? 1 : 0;
-  while (k > 0) {
-    const r = recs[k]!;
-    if (r.closes) depth++;
-    if (r.opens) {
-      depth--;
-      if (depth <= 0) break;
-    }
-    k--;
-  }
-  return k;
+  const opener = frameOpener(recs, recs[step - 1]!.closes ? step - 1 : step);
+  return opener >= 0 ? opener : undefined;
 }
 
 /** Step forward past a whole unification; does nothing when none is about to open. */
@@ -294,21 +300,7 @@ export const debugView: () => DebugView | undefined = createRoot(() =>
     if (!d) return undefined;
     const m = d.trace.at(d.step);
     const snap = m.snapshot();
-    let frameStart = -1;
-    if (snap.unify) {
-      let depth = 0;
-      for (let k = d.step - 1; k >= 0; k--) {
-        const r = d.trace.records[k]!;
-        if (r.closes) depth++;
-        if (r.opens) {
-          if (depth === 0) {
-            frameStart = k;
-            break;
-          }
-          depth--;
-        }
-      }
-    }
+    const frameStart = snap.unify ? frameOpener(d.trace.records, d.step) : -1;
     return { trace: d.trace, step: d.step, m, snap, record: d.trace.records[d.step - 1], frameStart };
   }),
 );
