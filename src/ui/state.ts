@@ -210,48 +210,66 @@ export function debugStep(delta: number): void {
   if (d) debugGoto(d.step + delta);
 }
 
-/** Step forward past a whole unification (or one command when none is open). */
+/**
+ * The step that "step over" would land on from `step`, or undefined when the
+ * next command does not open a unification (so stepping over would be no
+ * different from stepping).
+ */
+export function stepOverTarget(recs: readonly StepRecord[], step: number): number | undefined {
+  const next = recs[step];
+  if (!next?.opens) return undefined;
+  // Run until the frame this step opened is closed.
+  let k = step + 1;
+  let depth = 1;
+  while (k < recs.length && depth > 0) {
+    const r = recs[k]!;
+    if (r.opens) depth++;
+    if (r.closes) depth--;
+    k++;
+  }
+  return k;
+}
+
+/**
+ * The step that "back over" would land on from `step`: just before the
+ * unification the last step is inside of or just closed. Undefined when the
+ * last step is not part of a unification.
+ */
+export function stepBackOverTarget(recs: readonly StepRecord[], step: number): number | undefined {
+  if (step === 0) return undefined;
+  let k = step - 1;
+  const last = recs[k]!;
+  // Just after the opener the frame is open but nothing has run inside it yet:
+  // leaving it backwards is one step.
+  if (last.opens && !last.closes) return k;
+  if (last.level !== "unify" && !last.closes) return undefined;
+  let depth = last.closes ? 1 : 0;
+  while (k > 0) {
+    const r = recs[k]!;
+    if (r.closes) depth++;
+    if (r.opens) {
+      depth--;
+      if (depth <= 0) break;
+    }
+    k--;
+  }
+  return k;
+}
+
+/** Step forward past a whole unification; does nothing when none is about to open. */
 export function debugStepOver(): void {
   const d = debug();
   if (!d) return;
-  const recs = d.trace.records;
-  let k = d.step;
-  const next = recs[k];
-  if (!next) return;
-  k++;
-  if (next.opens) {
-    // Run until the frame this step opened is closed.
-    let depth = 1;
-    while (k < recs.length && depth > 0) {
-      const r = recs[k]!;
-      if (r.opens) depth++;
-      if (r.closes) depth--;
-      k++;
-    }
-  }
-  debugGoto(k);
+  const k = stepOverTarget(d.trace.records, d.step);
+  if (k !== undefined) debugGoto(k);
 }
 
-/** Step back to before the unification the current step is inside of, or one step. */
+/** Step back to before the unification the current step is inside of; does nothing outside one. */
 export function debugStepBackOver(): void {
   const d = debug();
-  if (!d || d.step === 0) return;
-  const recs = d.trace.records;
-  let k = d.step - 1;
-  const last = recs[k]!;
-  if (last.level === "unify" || last.closes) {
-    let depth = last.closes ? 1 : 0;
-    while (k > 0) {
-      const r = recs[k]!;
-      if (r.closes) depth++;
-      if (r.opens) {
-        depth--;
-        if (depth <= 0) break;
-      }
-      k--;
-    }
-  }
-  debugGoto(k);
+  if (!d) return;
+  const k = stepBackOverTarget(d.trace.records, d.step);
+  if (k !== undefined) debugGoto(k);
 }
 
 export function closeDebugger(): void {

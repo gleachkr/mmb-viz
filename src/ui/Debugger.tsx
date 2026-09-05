@@ -6,7 +6,7 @@ import { UNIFY_MODE_TEXT, type Check, type HeapEntry, type Machine, type StackEn
 import { childrenOf, type Span } from "../core/spans";
 import { CATEGORY_CLASS } from "./DeclCard";
 import { familyClass } from "./format";
-import { debugGoto, debugStep, debugStepBackOver, debugStepOver, debugView, goTo, loaded, openDebugger, reveal, setCenterTab, setInspTab, type DebugView } from "./state";
+import { debugGoto, debugStep, debugStepBackOver, debugStepOver, debugView, stepBackOverTarget, stepOverTarget, goTo, loaded, openDebugger, reveal, setCenterTab, setInspTab, type DebugView } from "./state";
 
 const KIND_MARK: Record<StackEntry["kind"], string> = { expr: "", proof: "|-", conv: "=", coconv: "=?=" };
 
@@ -108,7 +108,7 @@ function Head(props: { v: DebugView }) {
         <button class="btn small" onClick={() => debugGoto(0)} title="restart (r)" disabled={props.v.step === 0}>
           ⏮ restart
         </button>
-        <button class="btn small" onClick={debugStepBackOver} title="back over a unification (<)" disabled={props.v.step === 0}>
+        <button class="btn small" onClick={debugStepBackOver} title="back over a unification (<)" disabled={stepBackOverTarget(props.v.trace.records, props.v.step) === undefined}>
           ◀◀
         </button>
         <button class="btn small" onClick={() => debugStep(-1)} title="step back (,)" disabled={props.v.step === 0}>
@@ -117,7 +117,7 @@ function Head(props: { v: DebugView }) {
         <button class="btn small primary" onClick={() => debugStep(1)} title="step (.)" disabled={props.v.step >= n()}>
           step ▶
         </button>
-        <button class="btn small" onClick={debugStepOver} title="step over a unification (>)" disabled={props.v.step >= n()}>
+        <button class="btn small" onClick={debugStepOver} title="step over a unification (>)" disabled={stepOverTarget(props.v.trace.records, props.v.step) === undefined}>
           ▶▶
         </button>
         <button class="btn small" onClick={() => debugGoto(n())} title={result().status === "error" ? "run to the error (e)" : "run to the end (e)"} disabled={props.v.step >= n()}>
