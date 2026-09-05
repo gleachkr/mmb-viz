@@ -1,4 +1,4 @@
-import { createMemo, createRoot, createSignal } from "solid-js";
+import { createEffect, createMemo, createRoot, createSignal, on } from "solid-js";
 import { parseLayout, type Layout } from "../core/layout";
 import { allDecls, type DeclSummary } from "../core/decls";
 import { collectProblems, spanChainAt, type DeclRef, type Problem, type Span } from "../core/spans";
@@ -185,18 +185,65 @@ export function openDebugger(stmt: Statement, step?: number): void {
   setCenterTab("debug");
 }
 
-/** Open the debugger at the step that executes the command at `offset`, if that command is part of a proof. */
+/** Open the debugger on a statement's proof: at the failing step when it fails, else at the start; an open session on it is left where it is. */
+export function debugStatement(stmt: Statement): void {
+  const cur = debug();
+  if (cur?.trace.stmt === stmt && cur.trace.L === loaded()?.layout) setCenterTab("debug");
+  else openDebugger(stmt, resultOf(stmt.index)?.status === "error" ? Infinity : 0);
+}
+
+/** The statement whose proof or unify stream contains the command at `offset`, given the command's span. */
+function statementOfCommand(L: Layout, cmd: Span, offset: number): Statement | undefined {
+  if (cmd.kind === "unify.cmd") {
+    // A unify stream lives in the term or theorem table; it runs at the end of its own declaration's proof.
+    const o = cmd.owner;
+    return o && L.statements.find((s) => s.decl?.kind === o.kind && s.decl.id === o.id && s.hasProof);
+  }
+  return L.statements.find((s) => offset >= s.offset && offset < s.end);
+}
+
+/** Index of the record executing the command at `offset` nearest to `step`, or -1. */
+function stepNearOffset(trace: Trace, offset: number, step: number): number {
+  let best = -1;
+  trace.records.forEach((r, k) => {
+    if (offset < r.span.start || offset >= r.span.end) return;
+    if (best < 0 || Math.abs(k - (step - 1)) < Math.abs(best - (step - 1))) best = k;
+  });
+  return best;
+}
+
+/**
+ * Position the debugger at the step that executes the command at `offset`:
+ * in the open session when it runs that command, else in a session on the
+ * statement the command belongs to. Returns false when the offset is not a
+ * proof or unify command. Does not change which pane is showing.
+ */
 export function debugOffset(offset: number): boolean {
   const L = loaded()?.layout;
-  if (!L) return false;
-  const st = L.statements.find((s) => offset >= s.offset && offset < s.end);
+  if (!L || offset < 0) return false;
+  const cmd = spanChainAt(L.root, offset).find((s) => s.kind === "proof.cmd" || s.kind === "proof.stmt_cmd" || s.kind === "unify.cmd");
+  if (!cmd) return false;
+  const cur = debug();
+  if (cur && cur.trace.L === L) {
+    const r = cur.trace.records[cur.step - 1];
+    if (r && offset >= r.span.start && offset < r.span.end) return true;
+    const k = stepNearOffset(cur.trace, offset, cur.step);
+    if (k >= 0) {
+      setDebug({ trace: cur.trace, step: k + 1 });
+      return true;
+    }
+  }
+  const st = statementOfCommand(L, cmd, offset);
   if (!st) return false;
-  const trace = debug()?.trace.stmt === st ? debug()!.trace : new Trace(L, st);
-  const i = trace.stepAtOffset(offset);
-  setDebug({ trace, step: i < 0 ? 0 : i + 1 });
-  setCenterTab("debug");
+  const trace = cur?.trace.stmt === st && cur.trace.L === L ? cur.trace : new Trace(L, st);
+  const k = stepNearOffset(trace, offset, 0);
+  setDebug({ trace, step: k < 0 ? 0 : k + 1 });
   return true;
 }
+
+// The hexdump highlight and the debugger follow each other: stepping selects
+// the command's bytes (see Debugger), and selecting a command moves the machine.
+createRoot(() => createEffect(on(selected, (o) => void debugOffset(o), { defer: true })));
 
 export function debugGoto(step: number): void {
   const d = debug();

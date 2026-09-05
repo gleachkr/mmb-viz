@@ -2,7 +2,7 @@ import { createMemo, For, Show } from "solid-js";
 import { hex, type Cmd } from "../core/bytes";
 import { EXPLAIN, PROOF_OP_EXPLAIN, STMT_EXPLAIN, UNIFY_OP_EXPLAIN, type OpExplanation } from "../core/explain";
 import { family, jumpText, type Problem, type Span, type SpanKind } from "../core/spans";
-import { loaded, selectedChain, goTo, history, goBack, problems, scan, selectedOwner, inspTab, setInspTab, type InspTab, debugOffset, verification, openDebugger } from "./state";
+import { loaded, selectedChain, goTo, history, goBack, problems, scan, selectedOwner, inspTab, setInspTab, type InspTab, debugOffset, setCenterTab, verification, openDebugger } from "./state";
 import { describeValue, familyClass, rangeLabel, FAMILY_TITLES } from "./format";
 import { BitView, bitLayoutFor } from "./BitView";
 import { DeclCard } from "./DeclCard";
@@ -235,7 +235,13 @@ function FieldTab(props: { span: Span; chain: Span[]; op: OpExplanation | undefi
           </button>
         </Show>
         <Show when={props.span.kind === "proof.cmd" || props.span.kind === "proof.stmt_cmd" || props.span.kind === "proof.body"}>
-          <button class="btn small" onClick={() => debugOffset(props.span.start)} title="open the debugger with the machine positioned just after this command">
+          <button
+            class="btn small"
+            onClick={() => {
+              if (debugOffset(props.span.start)) setCenterTab("debug");
+            }}
+            title="open the debugger with the machine positioned just after this command"
+          >
             ▶ debug {props.span.kind === "proof.cmd" ? "this command" : "this statement"}
           </button>
         </Show>

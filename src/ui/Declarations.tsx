@@ -1,7 +1,7 @@
 import { createMemo, createSignal, For, Show } from "solid-js";
 import { type DeclCategory, type DeclSummary } from "../core/decls";
 import { CATEGORY_CLASS } from "./DeclCard";
-import { goToDecl, scan, selectedOwner, resultOf, verification } from "./state";
+import { centerTab, debugStatement, goToDecl, scan, selectedOwner, resultOf, verification } from "./state";
 
 const CATEGORIES: DeclCategory[] = ["sort", "term", "def", "axiom", "theorem"];
 const PAGE = 200;
@@ -51,10 +51,15 @@ export function Declarations() {
     const o = selectedOwner();
     return !!o && o.kind === d.ref.kind && o.id === d.id;
   };
+  // A row navigates whichever center pane is showing: the hexdump to the
+  // declaration, the debugger to its proof.
+  const pick = (d: DeclSummary) => {
+    goToDecl(d.ref);
+    if (centerTab() === "debug" && d.statement?.hasProof) debugStatement(d.statement);
+  };
 
   return (
     <div class="decls">
-      <div class="pane-title">Declarations</div>
       <Show when={scan()} fallback={<div class="explain muted">Decoding every stream…</div>}>
         <div class="decl-filters">
           <input
@@ -97,13 +102,26 @@ export function Declarations() {
         <div class="decl-list">
           <For each={filtered().slice(0, shown())}>
             {(d) => (
-              <div class="decl-row" classList={{ selected: isSelected(d), problem: d.problems.length > 0 }} onClick={() => goToDecl(d.ref)} title={d.signature}>
+              <div class="decl-row" classList={{ selected: isSelected(d), problem: d.problems.length > 0 }} onClick={() => pick(d)} title={d.signature}>
                 <i class={`swatch ${CATEGORY_CLASS[d.category]}`} />
                 <Show when={d.statement?.hasProof}>
                   <i class={`vstat ${resultOf(d.statement!.index)?.status ?? ""}`} title={resultOf(d.statement!.index)?.status ?? "not verified yet"} />
                 </Show>
                 <span class="decl-row-name">{d.name}</span>
                 <span class="decl-row-sig">{sigTail(d)}</span>
+                <Show when={d.statement?.hasProof}>
+                  <button
+                    class="decl-row-dbg"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      goToDecl(d.ref);
+                      debugStatement(d.statement!);
+                    }}
+                    title="step through this proof in the debugger"
+                  >
+                    ▶
+                  </button>
+                </Show>
               </div>
             )}
           </For>

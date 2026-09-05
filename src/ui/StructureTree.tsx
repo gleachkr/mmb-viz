@@ -50,7 +50,6 @@ export function StructureTree() {
 
   return (
     <div class="tree">
-      <div class="pane-title">Structure</div>
       <For each={groups()}>
         {(g) => (
           <Show when={g.regions.length > 1} fallback={<Node span={g.regions[0]!} depth={0} />}>

@@ -51,9 +51,12 @@ Milestones M0, M1, and M2 are done:
   and (inside a unification) the unify stream with the program counter,
   panels for the stack, heap, hypotheses, unify stack and unify heap with
   changed entries highlighted and node ids visible, and a narrative for
-  each step with its checks and the bytes it read; the hexdump highlights
-  the current command and what it consulted, and any proof command in the
-  hexdump can be opened in the debugger at that step;
+  each step with its checks and the bytes it read; the hexdump and the
+  debugger follow each other: stepping selects the command's bytes, and
+  selecting a proof or unify command in the hexdump moves the machine to
+  the step that executes it (opening the owning statement's proof when
+  needed); the declarations browser opens a proof in the debugger from a
+  row's ▶ button, or by clicking the row while the debugger is showing;
 - tests against mm0-c as an oracle (`tests/oracle.test.ts`): accept/reject
   and the failing statement must agree on the tutorial, its mutants, peano,
   and the mm0 repository's run tests; known divergences are listed there
