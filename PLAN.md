@@ -7,8 +7,8 @@ A static website. Drop a `.mmb` file into the browser and get:
 2. A steppable verification: run the MMB stack machine one command at a
    time, watch the stacks and heaps change, read a narrative of each step,
    and see which bytes each step consumed.
-3. Breakpoints, time travel, an error explorer, and a companion view of the
-   relevant spec section.
+3. Time travel, an error explorer, and a companion view of the relevant
+   spec section.
 
 Scope: everything defined by `mm0-c/mmb.md` (the MMB spec). The MM0
 cross-check (`.mm0` file matching) is outside the MMB spec and is not planned
@@ -30,7 +30,7 @@ designed from the start for instrumentation (explicit state, `step()`,
 snapshots, byte provenance on every value).
 
 Why not instrument the Zig/wasm verifier: Aufbau's wasm exposes only a
-whole-file `verify_pair`. Stepping, breakpoints, and "which bytes did this
+whole-file `verify_pair`. Stepping, time travel, and "which bytes did this
 step read" need hooks at every command and at every internal check. Adding
 that to the trusted core would either bloat the auditable kernel or require a
 serialized trace of every state, which is heavy and awkward to time-travel.
@@ -238,8 +238,8 @@ Filter by name, kind, local/public, has-proof, uses `Sorry`.
 
 - Statement list with status (unverified, ok, error, sorry) and a "run all"
   button. Click to open a statement.
-- Disassembly of the statement's proof stream with the pc marker,
-  breakpoints in the gutter, and the byte offset of each command.
+- Disassembly of the statement's proof stream with the pc marker and the
+  byte offset of each command.
 - Panels: main stack, heap, hypotheses, `next_bv`, and (when active) the
   unify stack and unify heap with the unify stream disassembly. Changed
   entries flash on each step.
@@ -248,8 +248,8 @@ Filter by name, kind, local/public, has-proof, uses `Sorry`.
   same node (sharing).
 - Controls: step, step into, step over, step out, step back, continue,
   run to error, restart statement. Keyboard shortcuts.
-- Breakpoints: at a command, on an opcode kind (every `Unfold`), on a
-  statement (by name), on any error, on use of a theorem or term.
+- Breakpoints: dropped (2026-09-05). Jumping to any command from the
+  hexdump or the declarations browser covers the need.
 - Narrative panel: for the current step, the rule from the spec (before and
   after stack pictures, like the spec's `H; S, e1..en --> ...` notation,
   instantiated with real values), the list of checks with pass/fail, and
@@ -365,9 +365,9 @@ linked to the hexdump. Whole-file verification runs on the main thread in
 40 ms slices rather than in a worker (peano takes under a second), and time
 travel uses keyframes every 64 steps plus re-execution.
 
-M3, teaching features: step into unification, breakpoints, narrative panel
-with instantiated spec rules, expression identity and V/FV display, error
-explorer, statement list with run-all status.
+M3, teaching features: step into unification, narrative panel with
+instantiated spec rules, expression identity and V/FV display, error
+explorer, statement list with run-all status. Breakpoints were dropped.
 
 M4, polish and publish: shareable URLs, what-if editing, statistics,
 keyboard shortcuts, dark mode, accessibility pass, GitHub Pages deploy,

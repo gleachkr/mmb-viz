@@ -79,8 +79,8 @@ between the hexdump and the debugger; `1`–`4` pick the inspector tab;
 Alt+Left goes back after a jump. In the debugger: `.` step, `,` back, `>`
 step over a unification, `<` back over one, `r` restart, `e` run to the end.
 
-Next (M3): breakpoints, the narrative panel with instantiated spec rules,
-expression identity and V/FV display, and the error explorer.
+Next (M3): the narrative panel with instantiated spec rules, and the error
+explorer.
 
 ## Develop
 
