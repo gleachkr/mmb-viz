@@ -334,33 +334,63 @@ const containing: () => ReadonlySet<number> = createRoot(() =>
   }),
 );
 
-/** A `#N` node id that focuses its node on hover and pins it on click. */
-function NodeRef(props: { id: number }) {
+/** A `#N` node id that pins its node on click; inside the nodes panel it also focuses on hover. */
+function NodeRef(props: { id: number; hover?: boolean }) {
   return (
     <span
       class="node-ref"
       classList={{ focus: focusNode() === props.id, pinned: pinNode() === props.id }}
-      onMouseEnter={() => setHoverNode(props.id)}
-      onMouseLeave={() => setHoverNode(undefined)}
+      onMouseEnter={() => props.hover && setHoverNode(props.id)}
+      onMouseLeave={() => props.hover && setHoverNode(undefined)}
       onClick={(e) => {
         e.stopPropagation();
         setPinNode(pinNode() === props.id ? undefined : props.id);
       }}
-      title="node id: hover to see every pointer to this node, click to pin"
+      title={props.hover ? "node id: every pointer to this node is highlighted; click to pin" : "node id: click to pin and highlight every pointer to this node"}
     >
       #{props.id}
     </span>
   );
 }
 
-function Panel(props: { title: string; count: number; empty: string; children: unknown; class?: string }) {
+/** Which state panels are folded away, by panel class; remembered across sessions. */
+const [folded, setFolded] = createSignal<ReadonlySet<string>>(readFolded());
+function readFolded(): Set<string> {
+  try {
+    return new Set(JSON.parse(localStorage.getItem("mmb-viz.dbg-folded") ?? "[]") as string[]);
+  } catch {
+    return new Set();
+  }
+}
+function toggleFold(key: string): void {
+  const next = new Set(folded());
+  if (!next.delete(key)) next.add(key);
+  setFolded(next);
+  try {
+    localStorage.setItem("mmb-viz.dbg-folded", JSON.stringify([...next]));
+  } catch {
+    /* private mode: the fold just does not persist */
+  }
+}
+
+/** A panel's title row with the disclosure triangle. */
+function PanelTitle(props: { id: string; title: string; count: number }) {
   return (
-    <div class={`dbg-panel ${props.class ?? ""}`}>
-      <div class="dbg-panel-title">
-        {props.title} <span class="muted">{props.count}</span>
-      </div>
-      <Show when={props.count} fallback={<div class="dbg-empty muted">{props.empty}</div>}>
-        <div class="dbg-panel-rows">{props.children as never}</div>
+    <button class="dbg-panel-title" classList={{ folded: folded().has(props.id) }} onClick={() => toggleFold(props.id)} title={folded().has(props.id) ? "show" : "hide"}>
+      <span class="dbg-fold">▾</span>
+      {props.title} <span class="muted">{props.count}</span>
+    </button>
+  );
+}
+
+function Panel(props: { title: string; count: number; empty: string; children: unknown; class: string }) {
+  return (
+    <div class={`dbg-panel ${props.class}`} classList={{ folded: folded().has(props.class) }}>
+      <PanelTitle id={props.class} title={props.title} count={props.count} />
+      <Show when={!folded().has(props.class)}>
+        <Show when={props.count} fallback={<div class="dbg-empty muted">{props.empty}</div>}>
+          <div class="dbg-panel-rows">{props.children as never}</div>
+        </Show>
       </Show>
     </div>
   );
@@ -480,7 +510,7 @@ function NodeShape(props: { m: Machine; n: ExprNode }) {
     <span class="dbg-node-shape">
       <Show when={props.n.kind === "term"} fallback={<span>{props.n.name}</span>}>
         <span>{props.m.termName(props.n.term!)}</span>
-        <For each={props.n.args}>{(a) => <NodeRef id={a} />}</For>
+        <For each={props.n.args}>{(a) => <NodeRef id={a} hover />}</For>
       </Show>
     </span>
   );
@@ -502,12 +532,9 @@ function NodesPanel(props: { v: DebugView }) {
     box.querySelector(`[data-node="${id}"]`)?.scrollIntoView({ block: "nearest" });
   });
   return (
-    <div class="dbg-panel nodes">
-      <div class="dbg-panel-title">
-        nodes <span class="muted">{m().arenaLen}</span>
-        <span class="dbg-panel-hint muted">the arena: every entry above is a pointer into it</span>
-      </div>
-      <div class="dbg-panel-rows" ref={box}>
+    <div class="dbg-panel nodes" classList={{ folded: folded().has("nodes") }}>
+      <PanelTitle id="nodes" title="nodes" count={m().arenaLen} />
+      <div class="dbg-panel-rows" ref={box} hidden={folded().has("nodes")}>
         <For each={nodes()}>
           {(n) => (
             <div
@@ -519,7 +546,7 @@ function NodesPanel(props: { v: DebugView }) {
               onClick={() => setPinNode(pinNode() === n.id ? undefined : n.id)}
             >
               <span class="dbg-idx muted">
-                <NodeRef id={n.id} />
+                <NodeRef id={n.id} hover />
               </span>
               <NodeShape m={m()} n={n} />
               <Show when={n.kind === "term" && n.args!.length}>
@@ -534,7 +561,7 @@ function NodesPanel(props: { v: DebugView }) {
           )}
         </For>
       </div>
-      <Show when={focused()}>{(n) => <NodeCard v={props.v} n={n()} />}</Show>
+      <Show when={!folded().has("nodes") && focused()}>{(n) => <NodeCard v={props.v} n={n()} />}</Show>
     </div>
   );
 }
@@ -563,7 +590,7 @@ function NodeCard(props: { v: DebugView; n: ExprNode }) {
           <span class="dbg-key">args</span>
           <span>
             <Show when={props.n.args!.length} fallback={<span class="muted">none</span>}>
-              <For each={props.n.args}>{(a) => <NodeRef id={a} />}</For>
+              <For each={props.n.args}>{(a) => <NodeRef id={a} hover />}</For>
             </Show>
           </span>
         </Show>
@@ -588,7 +615,7 @@ function NodeCard(props: { v: DebugView; n: ExprNode }) {
         <span class="dbg-key">under</span>
         <span>
           <Show when={uses().parents.length} fallback={<span class="muted">no larger node yet</span>}>
-            <For each={uses().parents}>{(p) => <NodeRef id={p} />}</For>
+            <For each={uses().parents}>{(p) => <NodeRef id={p} hover />}</For>
           </Show>
         </span>
       </div>
