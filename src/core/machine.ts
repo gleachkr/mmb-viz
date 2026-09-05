@@ -589,7 +589,7 @@ export class Machine {
         const node = this.alloc({ kind: "term", sort: t!.retSort, bound: false, v, fv, term: data, args });
         this.push({ kind: "expr", e: node.id });
         if (save) this.pushHeap({ kind: "expr", e: node.id });
-        this.say(rec, () => `${n ? `Pops ${n} argument${n === 1 ? "" : "s"} and allocates` : "Allocates"} #${node.id} = ${this.show(node.id)} : ${this.sortName(t!.retSort)}, pushed on the stack${save ? ` and saved as heap entry ${this.heap.length - 1}` : ""}.`);
+        this.say(rec, () => `${n ? `Pops ${n} argument${n === 1 ? "" : "s"} and allocates` : "Allocates"} \`#${node.id} = ${this.show(node.id)} : ${this.sortName(t!.retSort)}\`, pushed on the stack${save ? ` and saved as heap entry ${this.heap.length - 1}` : ""}.`);
         return;
       }
       case 0x12: {
@@ -599,11 +599,11 @@ export class Machine {
         if (hEntry.kind === "conv") {
           const ob = this.popKind("coconv", "obligation");
           this.check("obligation matches the saved conversion", "Proof Checking", ob.e1 === hEntry.e1 && ob.e2 === hEntry.e2, `heap entry ${data} proves ${this.showEntry(hEntry)}; the obligation is ${this.showEntry(ob)}${ob.e1 === hEntry.e1 && ob.e2 === hEntry.e2 ? "" : " (the sides must be the same nodes)"}`);
-          this.say(rec, () => `Heap entry ${data} is a conversion, so Ref discharges the obligation ${this.showEntry(ob)} instead of pushing.`);
+          this.say(rec, () => `Heap entry ${data} is a conversion, so Ref discharges the obligation \`${this.showEntry(ob)}\` instead of pushing.`);
         } else {
           this.push(hEntry);
           this.say(rec, () => {
-            return `Pushes heap entry ${data}, ${STACK_KIND_TEXT[hEntry.kind]} ${this.showEntry(hEntry)}, on the stack. The stack entry is a pointer to the interned expression node #${hEntry.e}, not a copy: Refl and unification compare pointers.`;
+            return `Pushes heap entry ${data}, ${STACK_KIND_TEXT[hEntry.kind]} \`${this.showEntry(hEntry)}\`, on the stack. The stack entry is a pointer to the interned expression node #${hEntry.e}, not a copy: Refl and unification compare pointers.`;
           });
         }
         return;
@@ -624,7 +624,7 @@ export class Machine {
         this.nextBv++;
         this.push({ kind: "expr", e: node.id });
         this.pushHeap({ kind: "expr", e: node.id });
-        this.say(rec, () => `Allocates a new bound variable ${name} : ${this.sortName(data)} (bit ${node.bv} of the deps bitmaps), pushed on the stack and saved as heap entry ${this.heap.length - 1}; next_bv becomes ${this.nextBv}.`);
+        this.say(rec, () => `Allocates a new bound variable \`${name} : ${this.sortName(data)}\` (bit ${node.bv} of the deps bitmaps), pushed on the stack and saved as heap entry ${this.heap.length - 1}; next_bv becomes ${this.nextBv}.`);
         return;
       }
       case 0x14:
@@ -672,7 +672,7 @@ export class Machine {
         const stream = t!.unifySpan;
         this.check("theorem has a unify stream", "Theorem Table", !!stream, stream ? "" : "the theorem's data block has no unify stream");
         this.openUnify(rec, "thm", { kind: "thm", id: data }, stream!, uheap, e.e, { kind: "thm", e: e.e, save });
-        this.say(rec, () => `Applies ${tname} with ${n} argument${n === 1 ? "" : "s"} to prove ${this.show(e.e)}. The arguments become the unify heap and the unify stream must now match the claimed conclusion${t!.hypNames?.length || stream!.label.includes("UHyp") ? " and the hypotheses on the stack" : ""}.`);
+        this.say(rec, () => `Applies ${tname} with ${n} argument${n === 1 ? "" : "s"} to prove \`${this.show(e.e)}\`. The arguments become the unify heap and the unify stream must now match the claimed conclusion${t!.hypNames?.length || stream!.label.includes("UHyp") ? " and the hypotheses on the stack" : ""}.`);
         return;
       }
       case 0x16: {
@@ -685,7 +685,7 @@ export class Machine {
         this.hyps.push(e.e);
         rec.hypPushed = e.e;
         this.pushHeap({ kind: "proof", e: e.e });
-        this.say(rec, () => `Records ${this.show(e.e)} as hypothesis ${this.hyps.length} and saves |- ${this.show(e.e)} as heap entry ${this.heap.length - 1}.`);
+        this.say(rec, () => `Records \`${this.show(e.e)}\` as hypothesis ${this.hyps.length} and saves \`|- ${this.show(e.e)}\` as heap entry ${this.heap.length - 1}.`);
         return;
       }
       case 0x17: {
@@ -694,21 +694,21 @@ export class Machine {
         const e1 = this.popKind("expr", "e1");
         this.push({ kind: "proof", e: e1.e });
         this.push({ kind: "coconv", e1: e1.e, e2: p.e });
-        this.say(rec, () => `Claims |- ${this.show(e1.e)} from |- ${this.show(p.e)}, leaving the obligation ${this.show(e1.e)} =?= ${this.show(p.e)} to discharge.`);
+        this.say(rec, () => `Claims \`|- ${this.show(e1.e)}\` from \`|- ${this.show(p.e)}\`, leaving the obligation \`${this.show(e1.e)} =?= ${this.show(p.e)}\` to discharge.`);
         return;
       }
       case 0x18: {
         // Refl
         const ob = this.popKind("coconv", "e1 =?= e2");
         this.check("both sides are the same node", "Proof Checking", ob.e1 === ob.e2, `#${ob.e1} ${this.show(ob.e1)} and #${ob.e2} ${this.show(ob.e2)}${ob.e1 === ob.e2 ? "" : " are different nodes (pointer equality, not structural)"}`);
-        this.say(rec, () => `Discharges ${this.showEntry(ob)}: both sides are node #${ob.e1}.`);
+        this.say(rec, () => `Discharges \`${this.showEntry(ob)}\`: both sides are node #${ob.e1}.`);
         return;
       }
       case 0x19: {
         // Sym
         const ob = this.popKind("coconv", "e1 =?= e2");
         this.push({ kind: "coconv", e1: ob.e2, e2: ob.e1 });
-        this.say(rec, () => `Swaps the obligation to ${this.show(ob.e2)} =?= ${this.show(ob.e1)}.`);
+        this.say(rec, () => `Swaps the obligation to \`${this.show(ob.e2)} =?= ${this.show(ob.e1)}\`.`);
         return;
       }
       case 0x1a: {
@@ -733,7 +733,7 @@ export class Machine {
         this.check("def has a unify stream", "Term Table", !!t.unifySpan, "");
         const uheap = a.args!.map((id) => ({ e: id, saved: false }));
         this.openUnify(rec, "unfold", { kind: "term", id: a.term! }, t.unifySpan!, uheap, e.e, { kind: "unfold", e: e.e, e2: ob.e2 });
-        this.say(rec, () => `Unfolds ${this.show(a.id)}: its arguments become the unify heap and the unify stream of ${this.termName(a.term!)} must match ${this.show(e.e)}; then the obligation becomes ${this.show(e.e)} =?= ${this.show(ob.e2)}.`);
+        this.say(rec, () => `Unfolds \`${this.show(a.id)}\`: its arguments become the unify heap and the unify stream of ${this.termName(a.term!)} must match \`${this.show(e.e)}\`; then the obligation becomes \`${this.show(e.e)} =?= ${this.show(ob.e2)}\`.`);
         return;
       }
       case 0x1c: {
@@ -741,14 +741,14 @@ export class Machine {
         const ob = this.popKind("coconv", "e1 =?= e2");
         this.push({ kind: "conv", e1: ob.e1, e2: ob.e2 });
         this.push({ kind: "coconv", e1: ob.e1, e2: ob.e2 });
-        this.say(rec, () => `Keeps the conversion ${this.show(ob.e1)} = ${this.show(ob.e2)} beneath its obligation, so it can be saved once discharged.`);
+        this.say(rec, () => `Keeps the conversion \`${this.show(ob.e1)} = ${this.show(ob.e2)}\` beneath its obligation, so it can be saved once discharged.`);
         return;
       }
       case 0x1e: {
         // ConvSave
         const c = this.popKind("conv", "e1 = e2");
         this.pushHeap(c);
-        this.say(rec, () => `Moves the conversion ${this.showEntry(c)} to heap entry ${this.heap.length - 1}.`);
+        this.say(rec, () => `Moves the conversion \`${this.showEntry(c)}\` to heap entry ${this.heap.length - 1}.`);
         return;
       }
       case 0x1f: {
@@ -757,7 +757,7 @@ export class Machine {
         this.check("stack not empty", "Proof Checking", !!top, top ? "" : "Save needs a stack element");
         this.check("not an obligation", "Proof Checking", top!.kind !== "coconv", top!.kind === "coconv" ? `${this.showEntry(top!)} is an obligation, which cannot be saved` : "");
         this.pushHeap(top as HeapEntry);
-        this.say(rec, () => `Saves ${STACK_KIND_TEXT[top!.kind]} ${this.showEntry(top!)} as heap entry ${this.heap.length - 1} without popping it.`);
+        this.say(rec, () => `Saves ${STACK_KIND_TEXT[top!.kind]} \`${this.showEntry(top!)}\` as heap entry ${this.heap.length - 1} without popping it.`);
         return;
       }
       case 0x20: {
@@ -767,11 +767,11 @@ export class Machine {
         const s = this.pop();
         if (s.kind === "expr") {
           this.push({ kind: "proof", e: s.e });
-          this.say(rec, () => `Admits |- ${this.show(s.e)} without proof. The statement can no longer count as verified.`);
+          this.say(rec, () => `Admits \`|- ${this.show(s.e)}\` without proof. The statement can no longer count as verified.`);
         } else {
           // The spec drops an obligation; mm0-c's code pops a conversion instead (see SPEC_NOTES).
           this.check("Sorry pops an expression or an obligation", "Proof Checking", s.kind === "coconv", `found ${STACK_KIND_TEXT[s.kind]} ${this.showEntry(s)}`);
-          this.say(rec, () => `Drops the obligation ${this.showEntry(s)} without discharging it. The statement can no longer count as verified.`);
+          this.say(rec, () => `Drops the obligation \`${this.showEntry(s)}\` without discharging it. The statement can no longer count as verified.`);
         }
         return;
       }
@@ -813,7 +813,7 @@ export class Machine {
       const uheap = this.heap.slice(0, t.numArgs).map((h) => ({ e: (h as { e: number }).e, saved: false }));
       this.check("def has a unify stream", "Term Table", !!t.unifySpan, "");
       this.openUnify(rec, "def-end", this.declRef!, t.unifySpan!, uheap, e.id, { kind: "finish" });
-      this.say(rec, () => `The body is complete: the value is ${this.show(e.id)}. Now the unify stream of the def must describe exactly this expression.`);
+      this.say(rec, () => `The body is complete: the value is \`${this.show(e.id)}\`. Now the unify stream of the def must describe exactly this expression.`);
       return;
     }
     const t = this.decl as Thm;
@@ -825,7 +825,7 @@ export class Machine {
     const uheap = this.heap.slice(0, t.numArgs).map((h) => ({ e: (h as { e: number }).e, saved: false }));
     this.check("theorem has a unify stream", "Theorem Table", !!t.unifySpan, "");
     this.openUnify(rec, "thm-end", this.declRef!, t.unifySpan!, uheap, e.id, { kind: "finish" });
-    this.say(rec, () => `The proof is complete: ${axiom ? "the conclusion is" : "it proves"} ${this.show(e.id)} with ${this.hyps.length} hypothes${this.hyps.length === 1 ? "is" : "es"}. Now the unify stream must describe exactly this statement.`);
+    this.say(rec, () => `The proof is complete: ${axiom ? "the conclusion is" : "it proves"} \`${this.show(e.id)}\` with ${this.hyps.length} hypothes${this.hyps.length === 1 ? "is" : "es"}. Now the unify stream must describe exactly this statement.`);
   }
 
   private openUnify(rec: StepRecord, mode: UnifyMode, owner: DeclRef, stream: Span, uheap: { e: number; saved: boolean }[], target: number, onEnd: UnifyFrame["onEnd"]): void {
@@ -869,10 +869,10 @@ export class Machine {
         if (end.kind === "thm") {
           this.push({ kind: "proof", e: end.e });
           if (end.save) this.pushHeap({ kind: "proof", e: end.e });
-          this.say(rec, () => `Unification succeeded: pushes |- ${this.show(end.e)}${end.save ? ` and saves it as heap entry ${this.heap.length - 1}` : ""}.`);
+          this.say(rec, () => `Unification succeeded: pushes \`|- ${this.show(end.e)}\`${end.save ? ` and saves it as heap entry ${this.heap.length - 1}` : ""}.`);
         } else if (end.kind === "unfold") {
           this.push({ kind: "coconv", e1: end.e, e2: end.e2 });
-          this.say(rec, () => `The def unfolds as claimed: pushes the obligation ${this.show(end.e)} =?= ${this.show(end.e2)}.`);
+          this.say(rec, () => `The def unfolds as claimed: pushes the obligation \`${this.show(end.e)} =?= ${this.show(end.e2)}\`.`);
         } else {
           this.phase = "done";
           this.say(rec, () => this.mode === "def" ? "The value matches the unify stream. The def is verified." : `The proved statement matches the unify stream. The ${this.stmt.opcode === 0x02 ? "axiom" : "theorem"} is verified${this.sorryUsed ? ", except that Sorry was used" : ""}.`);
@@ -885,7 +885,7 @@ export class Machine {
         const e = this.upop();
         const h = u.uheap[data]!.e;
         this.check("top of unify stack is unify heap entry", "Unification", e === h, `heap entry ${data} is #${h} ${this.show(h)}; the stack holds #${e} ${this.show(e)}${e === h ? "" : " (a different node; equality is by identity)"}`);
-        this.say(rec, () => `Matches ${this.show(e)} against unify heap entry ${data}: both are pointers to interned node #${e}.`);
+        this.say(rec, () => `Matches \`${this.show(e)}\` against unify heap entry ${data}: both are pointers to interned node #${e}.`);
         return;
       }
       case 0x30:
@@ -899,7 +899,7 @@ export class Machine {
         this.check(`top of unify stack is an application of ${t ? this.termName(data) : `term ${data}`}`, "Unification", n.kind === "term" && n.term === data, n.kind === "term" ? `found an application of ${this.termName(n.term!)}: ${this.show(e)}` : `found the variable ${this.show(e)}`);
         for (let i = n.args!.length - 1; i >= 0; i--) this.upush(n.args![i]!);
         if (save) this.upushHeap(e, true);
-        this.say(rec, () => `${this.show(e)} is an application of ${this.termName(data)}; its ${n.args!.length} argument${n.args!.length === 1 ? "" : "s"} go back on the unify stack, first argument on top${save ? `, and the whole is saved as unify heap entry ${u.uheap.length - 1}` : ""}.`);
+        this.say(rec, () => `\`${this.show(e)}\` is an application of ${this.termName(data)}; its ${n.args!.length} argument${n.args!.length === 1 ? "" : "s"} go back on the unify stack, first argument on top${save ? `, and the whole is saved as unify heap entry ${u.uheap.length - 1}` : ""}.`);
         return;
       }
       case 0x33: {
@@ -916,7 +916,7 @@ export class Machine {
           this.check(`dummy ${this.show(e)} not used by unify heap entry ${i}`, "Unification", overlap === 0n, `entry ${i} is ${this.show(h.e)}${overlap ? `, which uses ${this.show(e)}` : ""}`);
         });
         this.upushHeap(e, false);
-        this.say(rec, () => `${this.show(e)} is a fresh bound variable of sort ${this.sortName(data)}, distinct from everything substituted so far; it becomes unify heap entry ${u.uheap.length - 1}.`);
+        this.say(rec, () => `\`${this.show(e)}\` is a fresh bound variable of sort ${this.sortName(data)}, distinct from everything substituted so far; it becomes unify heap entry ${u.uheap.length - 1}.`);
         return;
       }
       case 0x36: {
@@ -925,13 +925,13 @@ export class Machine {
         if (u.mode === "thm") {
           const p = this.popKind("proof", "|- e (a hypothesis of the theorem being applied)");
           this.upush(p.e);
-          this.say(rec, () => `Pops the proof |- ${this.show(p.e)} from the main stack; the following unify commands must match it against the hypothesis.`);
+          this.say(rec, () => `Pops the proof \`|- ${this.show(p.e)}\` from the main stack; the following unify commands must match it against the hypothesis.`);
         } else {
           this.check("unify stack is empty before UHyp", "Unification", u.ustack.length === 0, u.ustack.length ? `${u.ustack.length} expression${u.ustack.length === 1 ? "" : "s"} left unmatched: ${u.ustack.map((x) => this.show(x)).join(", ")}` : "");
           this.check("the proof declared a hypothesis for this UHyp", "Unification", this.hyps.length > 0, "the proof's hypothesis list is empty, but the unify stream declares another hypothesis");
           const e = this.hyps.pop()!;
           this.upush(e);
-          this.say(rec, () => `Takes the last hypothesis the proof declared, ${this.show(e)}; the following unify commands must match it.`);
+          this.say(rec, () => `Takes the last hypothesis the proof declared, \`${this.show(e)}\`; the following unify commands must match it.`);
         }
         return;
       }

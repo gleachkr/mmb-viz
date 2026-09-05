@@ -431,7 +431,9 @@ function Narrative(props: { v: DebugView }) {
               <span class="dbg-mnemonic mono">{rec().mnemonic}</span>
               <span class="dbg-step-at mono muted">{hex(rec().span.start)}</span>
             </div>
-            <p class="dbg-summary">{rec().summary}</p>
+            <p class="dbg-summary">
+              <Prose text={rec().summary} />
+            </p>
             <Show when={rec().error}>
               {(err) => (
                 <div class="problem error dbg-error">
@@ -487,4 +489,10 @@ function Narrative(props: { v: DebugView }) {
       </Show>
     </section>
   );
+}
+
+/** Text with `backticked` runs rendered as code: the machine writes expressions that way in its summaries. */
+function Prose(props: { text: string }) {
+  const parts = createMemo(() => props.text.split("`"));
+  return <For each={parts()}>{(t, i) => (i() % 2 ? <code>{t}</code> : t)}</For>;
 }
