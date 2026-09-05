@@ -57,6 +57,11 @@ Milestones M0, M1, and M2 are done:
   the step that executes it (opening the owning statement's proof when
   needed); the declarations browser opens a proof in the debugger from a
   row's ▶ button, or by clicking the row while the debugger is showing;
+  a nodes panel shows the expression arena every entry points into (each
+  node's term applied to its argument ids, its sort, V and FV, the step
+  that made it, and everything pointing at it), and hovering any `#N`
+  anywhere in the debugger lights up every pointer to that node and every
+  larger node containing it; clicking pins it;
 - tests against mm0-c as an oracle (`tests/oracle.test.ts`): accept/reject
   and the failing statement must agree on the tutorial, its mutants, peano,
   and the mm0 repository's run tests; known divergences are listed there

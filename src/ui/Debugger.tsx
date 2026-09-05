@@ -1,8 +1,8 @@
-import { createEffect, createMemo, createSignal, For, on, Show } from "solid-js";
+import { createEffect, createMemo, createRoot, createSignal, For, on, Show } from "solid-js";
 import { hex, hex2, hexOffset } from "../core/bytes";
 import { categoryOf } from "../core/decls";
 import { declName, type Statement } from "../core/layout";
-import { UNIFY_MODE_TEXT, type Check, type HeapEntry, type Machine, type StackEntry } from "../core/machine";
+import { UNIFY_MODE_TEXT, type Check, type ExprNode, type HeapEntry, type Machine, type StackEntry } from "../core/machine";
 import { childrenOf, type Span } from "../core/spans";
 import { CATEGORY_CLASS } from "./DeclCard";
 import { familyClass } from "./format";
@@ -31,6 +31,17 @@ export function Debugger() {
       (span) => span && reveal(span.start),
     ),
   );
+  // Node ids belong to one trace: forget the focused node when the session changes.
+  const trace = createMemo(() => debugView()?.trace);
+  createEffect(
+    on(
+      trace,
+      () => {
+        setPinNode(undefined);
+        setHoverNode(undefined);
+      },
+    ),
+  );
   return (
     <div class="debugger">
       <Show when={debugView()} fallback={<DebugWelcome />}>
@@ -44,6 +55,7 @@ export function Debugger() {
               </section>
               <section class="dbg-state">
                 <StatePanels v={v()} />
+                <NodesPanel v={v()} />
               </section>
             </div>
             <Narrative v={v()} />
@@ -285,7 +297,7 @@ function UnifyStream(props: { v: DebugView; frame: NonNullable<DebugView["snap"]
 function EntryText(props: { m: Machine; e: StackEntry | HeapEntry }) {
   const ids = () => ("e" in props.e ? [props.e.e] : [props.e.e1, props.e.e2]);
   return (
-    <span class="dbg-entry">
+    <span class="dbg-entry" classList={{ hit: ids().some((i) => i === focusNode()), has: ids().some((i) => containing().has(i)) }}>
       <Show when={KIND_MARK[props.e.kind]}>
         <span class="dbg-kind" title={props.e.kind}>
           {KIND_MARK[props.e.kind]}
@@ -293,8 +305,50 @@ function EntryText(props: { m: Machine; e: StackEntry | HeapEntry }) {
       </Show>
       <span class="dbg-expr">{entryBody(props.m, props.e)}</span>
       <span class="node-id muted" title="node ids: equality in MMB is identity of nodes">
-        {ids().map((i) => `#${i}`).join(" ")}
+        <For each={ids()}>{(i) => <NodeRef id={i} />}</For>
       </span>
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Node focus: hovering or pinning a node id highlights every pointer to it
+
+const [hoverNode, setHoverNode] = createSignal<number>();
+const [pinNode, setPinNode] = createSignal<number>();
+/** The node the reader is looking at: hovered, else pinned. */
+const focusNode = () => hoverNode() ?? pinNode();
+const NO_NODES: ReadonlySet<number> = new Set();
+/** Ids of nodes that have the focused node as a subterm (itself included): arguments precede their parents, so one pass suffices. */
+const containing: () => ReadonlySet<number> = createRoot(() =>
+  createMemo(() => {
+    const f = focusNode();
+    const v = debugView();
+    if (f === undefined || !v || f >= v.m.arenaLen) return NO_NODES;
+    const out = new Set<number>([f]);
+    for (let i = f + 1; i < v.m.arenaLen; i++) {
+      const n = v.m.arena[i]!;
+      if (n.args?.some((a) => out.has(a))) out.add(i);
+    }
+    return out;
+  }),
+);
+
+/** A `#N` node id that focuses its node on hover and pins it on click. */
+function NodeRef(props: { id: number }) {
+  return (
+    <span
+      class="node-ref"
+      classList={{ focus: focusNode() === props.id, pinned: pinNode() === props.id }}
+      onMouseEnter={() => setHoverNode(props.id)}
+      onMouseLeave={() => setHoverNode(undefined)}
+      onClick={(e) => {
+        e.stopPropagation();
+        setPinNode(pinNode() === props.id ? undefined : props.id);
+      }}
+      title="node id: hover to see every pointer to this node, click to pin"
+    >
+      #{props.id}
     </span>
   );
 }
@@ -403,6 +457,146 @@ function StatePanels(props: { v: DebugView }) {
 }
 
 // ---------------------------------------------------------------------------
+// Arena: the backing store every stack and heap entry points into
+
+/** Where a node is pointed to from, at the current step. */
+function usesOf(v: DebugView, id: number): { slots: string[]; parents: number[] } {
+  const s = v.snap;
+  const slots: string[] = [];
+  const has = (e: StackEntry | HeapEntry) => ("e" in e ? e.e === id : e.e1 === id || e.e2 === id);
+  s.stack.forEach((e, i) => has(e) && slots.push(i === s.stack.length - 1 ? "stack top" : `stack ${i}`));
+  s.heap.forEach((e, i) => has(e) && slots.push(`heap ${i}`));
+  s.hyps.forEach((e, i) => e === id && slots.push(`hyp ${i + 1}`));
+  s.unify?.ustack.forEach((e, i) => e === id && slots.push(`unify stack ${i}`));
+  s.unify?.uheap.forEach((h, i) => h.e === id && slots.push(`unify heap ${i}`));
+  const parents: number[] = [];
+  for (let i = id + 1; i < v.m.arenaLen; i++) if (v.m.arena[i]!.args?.includes(id)) parents.push(i);
+  return { slots, parents };
+}
+
+/** A node's structure one level deep: its term applied to argument node ids, or its variable name. */
+function NodeShape(props: { m: Machine; n: ExprNode }) {
+  return (
+    <span class="dbg-node-shape">
+      <Show when={props.n.kind === "term"} fallback={<span>{props.n.name}</span>}>
+        <span>{props.m.termName(props.n.term!)}</span>
+        <For each={props.n.args}>{(a) => <NodeRef id={a} />}</For>
+      </Show>
+    </span>
+  );
+}
+
+function NodesPanel(props: { v: DebugView }) {
+  const m = () => props.v.m;
+  const nodes = () => m().arena.slice(0, m().arenaLen);
+  const allocated = () => props.v.record?.allocated ?? [];
+  const focused = () => {
+    const f = focusNode();
+    return f !== undefined && f < m().arenaLen ? m().arena[f] : undefined;
+  };
+  let box: HTMLDivElement | undefined;
+  // Keep the node of interest in view: the pinned one, else what this step allocated.
+  createEffect(() => {
+    const id = pinNode() ?? allocated()[allocated().length - 1];
+    if (id === undefined || !box) return;
+    box.querySelector(`[data-node="${id}"]`)?.scrollIntoView({ block: "nearest" });
+  });
+  return (
+    <div class="dbg-panel nodes">
+      <div class="dbg-panel-title">
+        nodes <span class="muted">{m().arenaLen}</span>
+        <span class="dbg-panel-hint muted">the arena: every entry above is a pointer into it</span>
+      </div>
+      <div class="dbg-panel-rows" ref={box}>
+        <For each={nodes()}>
+          {(n) => (
+            <div
+              class="dbg-srow dbg-nrow"
+              data-node={n.id}
+              classList={{ new: allocated().includes(n.id), hit: focusNode() === n.id, has: focusNode() !== n.id && containing().has(n.id) }}
+              onMouseEnter={() => setHoverNode(n.id)}
+              onMouseLeave={() => setHoverNode(undefined)}
+              onClick={() => setPinNode(pinNode() === n.id ? undefined : n.id)}
+            >
+              <span class="dbg-idx muted">
+                <NodeRef id={n.id} />
+              </span>
+              <NodeShape m={m()} n={n} />
+              <Show when={n.kind === "term" && n.args!.length}>
+                <span class="dbg-node-text muted">{m().show(n.id)}</span>
+              </Show>
+              <Show when={n.kind === "var"}>
+                <span class="dbg-node-tag muted" title={n.bound ? `bound variable: bit ${n.bv} of the deps bitmaps` : "a regular (non-bound) variable of the declaration"}>
+                  {n.bound ? "bound" : "var"}
+                </span>
+              </Show>
+            </div>
+          )}
+        </For>
+      </div>
+      <Show when={focused()}>{(n) => <NodeCard v={props.v} n={n()} />}</Show>
+    </div>
+  );
+}
+
+/** Everything the verifier knows about one node, and everything pointing at it. */
+function NodeCard(props: { v: DebugView; n: ExprNode }) {
+  const m = () => props.v.m;
+  const uses = createMemo(() => usesOf(props.v, props.n.id));
+  const kind = () => (props.n.kind === "term" ? `application of term ${m().termName(props.n.term!)}` : props.n.bound ? `bound variable (bit ${props.n.bv} of the deps bitmaps)` : "variable");
+  return (
+    <div class="dbg-node-card mono" classList={{ pinned: pinNode() === props.n.id }}>
+      <div class="dbg-node-head">
+        <NodeRef id={props.n.id} />
+        <code class="dbg-node-full">{m().show(props.n.id)}</code>
+        <span class="muted">: {m().sortName(props.n.sort)}</span>
+        <Show when={pinNode() === props.n.id}>
+          <button class="link-plain muted dbg-node-unpin" onClick={() => setPinNode(undefined)} title="unpin">
+            ×
+          </button>
+        </Show>
+      </div>
+      <div class="dbg-node-facts">
+        <span class="dbg-key">is</span>
+        <span>{kind()}</span>
+        <Show when={props.n.kind === "term"}>
+          <span class="dbg-key">args</span>
+          <span>
+            <Show when={props.n.args!.length} fallback={<span class="muted">none</span>}>
+              <For each={props.n.args}>{(a) => <NodeRef id={a} />}</For>
+            </Show>
+          </span>
+        </Show>
+        <span class="dbg-key" title="V(e): the bound variables occurring anywhere in e">V</span>
+        <span>{m().showDeps(props.n.v)}</span>
+        <span class="dbg-key" title="FV(e): the bound variables free in e, after the term's binders capture theirs">FV</span>
+        <span>{m().showDeps(props.n.fv)}</span>
+        <span class="dbg-key">made</span>
+        <span>
+          <Show when={props.n.by >= 0} fallback="before the proof">
+            <button class="link-plain" onClick={() => debugGoto(props.n.by + 1)} title="go to the step that allocated this node">
+              step {props.n.by + 1}
+            </button>
+          </Show>
+        </span>
+        <span class="dbg-key">in</span>
+        <span>
+          <Show when={uses().slots.length} fallback={<span class="muted">nothing points here now</span>}>
+            {uses().slots.join(", ")}
+          </Show>
+        </span>
+        <span class="dbg-key">under</span>
+        <span>
+          <Show when={uses().parents.length} fallback={<span class="muted">no larger node yet</span>}>
+            <For each={uses().parents}>{(p) => <NodeRef id={p} />}</For>
+          </Show>
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Narrative
 
 function Narrative(props: { v: DebugView }) {
@@ -437,7 +631,7 @@ function Narrative(props: { v: DebugView }) {
             <Show when={rec().error}>
               {(err) => (
                 <div class="problem error dbg-error">
-                  <b>Verification fails here.</b> {err().message}
+                  <b>Verification fails here.</b> <NodeText text={err().message} />
                 </div>
               )}
             </Show>
@@ -455,7 +649,9 @@ function Narrative(props: { v: DebugView }) {
                       <span class="dbg-check-mark">{c.passed ? "✓" : "✗"}</span>
                       <span class="dbg-check-name">{c.name}</span>
                       <Show when={c.detail}>
-                        <span class="dbg-check-detail muted">{c.detail}</span>
+                        <span class="dbg-check-detail muted">
+                          <NodeText text={c.detail} />
+                        </span>
                       </Show>
                       <span class="dbg-check-section muted">{c.section}</span>
                     </div>
@@ -494,5 +690,11 @@ function Narrative(props: { v: DebugView }) {
 /** Text with `backticked` runs rendered as code: the machine writes expressions that way in its summaries. */
 function Prose(props: { text: string }) {
   const parts = createMemo(() => props.text.split("`"));
-  return <For each={parts()}>{(t, i) => (i() % 2 ? <code>{t}</code> : t)}</For>;
+  return <For each={parts()}>{(t, i) => (i() % 2 ? <code><NodeText text={t} /></code> : <NodeText text={t} />)}</For>;
+}
+
+/** Text whose `#N` mentions are live node references. */
+function NodeText(props: { text: string }) {
+  const parts = createMemo(() => props.text.split(/(#\d+)/));
+  return <For each={parts()}>{(t, i) => (i() % 2 ? <NodeRef id={Number(t.slice(1))} /> : t)}</For>;
 }
