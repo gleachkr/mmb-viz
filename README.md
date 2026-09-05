@@ -46,7 +46,8 @@ Milestones M0, M1, and M2 are done:
   (peano's 583k steps take under a second) and feeds the declarations
   browser (status dots, a "failed" filter), the Problems tab, and the top
   bar;
-- the debugger (center pane): step, step back, step over and back over a
+- the debugger (center pane): the statement being proved in MM0 style
+  (foldable to its one-line signature); step, step back, step over and back over a
   unification, run to the end or to the error, a slider, the proof stream
   and (inside a unification) the unify stream with the program counter,
   panels for the stack, heap, hypotheses, unify stack and unify heap with

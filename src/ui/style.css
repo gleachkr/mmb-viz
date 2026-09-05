@@ -574,6 +574,15 @@ button { font: inherit; color: inherit; }
 .dbg-status.error { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
 .dbg-nav { margin-left: auto; display: flex; gap: 12px; }
 .dbg-nav .link:disabled { color: var(--ink-3); cursor: default; text-decoration: none; }
+.dbg-sig { display: flex; align-items: flex-start; gap: 4px; margin-top: 6px; }
+.dbg-sig-fold { background: none; border: 0; padding: 4px 0 0; cursor: pointer; color: var(--ink-3); line-height: 1; }
+.dbg-sig-fold:hover .dbg-fold { color: var(--ink); }
+.dbg-sig.folded .dbg-fold { transform: rotate(-90deg); }
+.dbg-sig-text {
+  flex: 1; min-width: 0; margin: 0; font-family: var(--mono); font-size: 12px; line-height: 1.5;
+  background: #fbf8f1; border: 1px solid var(--rule); padding: 4px 8px; white-space: pre-wrap; word-break: break-word;
+}
+.dbg-sig.folded .dbg-sig-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dbg-controls { display: flex; align-items: center; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
 .dbg-counter { font-size: 11px; color: var(--ink-2); margin-left: 6px; white-space: nowrap; }
 .dbg-slider { flex: 1; min-width: 120px; accent-color: var(--ink); }

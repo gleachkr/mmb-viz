@@ -1,6 +1,6 @@
 import { createEffect, createMemo, createRoot, createSignal, For, on, Show } from "solid-js";
 import { hex, hex2, hexOffset } from "../core/bytes";
-import { categoryOf } from "../core/decls";
+import { categoryOf, showStatement, summarize } from "../core/decls";
 import { declName, type Statement } from "../core/layout";
 import { UNIFY_MODE_TEXT, type Check, type ExprNode, type HeapEntry, type Machine, type StackEntry } from "../core/machine";
 import { childrenOf, type Span } from "../core/spans";
@@ -88,6 +88,7 @@ function Head(props: { v: DebugView }) {
   const st = () => props.v.trace.stmt;
   const name = () => (st().decl ? declName(L(), st().decl!) : "?");
   const cat = () => (st().decl ? categoryOf(L(), st().decl!) : "theorem");
+  const sig = createMemo(() => (st().decl ? summarize(L(), st().decl!) : undefined));
   const n = () => props.v.trace.length;
   const result = () => props.v.trace.result;
   const proofs = createMemo(() => L().statements.filter((s) => s.hasProof));
@@ -116,6 +117,16 @@ function Head(props: { v: DebugView }) {
           </button>
         </span>
       </div>
+      <Show when={sig()}>
+        {(d) => (
+          <div class="dbg-sig" classList={{ folded: folded().has("sig") }}>
+            <button class="dbg-sig-fold" onClick={() => toggleFold("sig")} title={folded().has("sig") ? "show the full statement" : "show only the signature"}>
+              <span class="dbg-fold">▾</span>
+            </button>
+            <pre class="dbg-sig-text">{folded().has("sig") ? d().signature : showStatement(d())}</pre>
+          </div>
+        )}
+      </Show>
       <div class="dbg-controls">
         <button class="btn small" onClick={() => debugGoto(0)} title="restart (r)" disabled={props.v.step === 0}>
           ⏮ restart
