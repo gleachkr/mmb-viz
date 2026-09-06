@@ -106,13 +106,7 @@ function Welcome() {
           <span class="brand-mark">mmb</span>-viz
         </h1>
         <p class="lede">
-          A visual explainer for Metamath Zero binary proof files. Drop a <code>.mmb</code> file anywhere on this page, or pick an example above, and every byte will be
-          colored by the structure it belongs to.
-        </p>
-        <p class="hint">
-          What you get: the annotated hexdump, a proportional file map, the structure tree, a declarations browser with MM0-style signatures, stream disassembly,
-          bit-field diagrams, an inspector that quotes the relevant passage of the spec, and a debugger that runs every proof through the MMB stack machine one
-          command at a time.
+          A visual explainer for Metamath Zero binary proof files. Drop a <code>.mmb</code> file anywhere on this page, or pick an example above.
         </p>
         <div class="welcome-actions">
           <button class="btn primary" onClick={() => void loadExample("tutorial.mmb")}>
