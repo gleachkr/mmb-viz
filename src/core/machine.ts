@@ -615,7 +615,7 @@ export class Machine {
         const node = this.alloc({ kind: "term", sort: t!.retSort, bound: false, v, fv, term: data, args });
         this.push({ kind: "expr", e: node.id });
         if (save) this.pushHeap({ kind: "expr", e: node.id });
-        this.say(rec, () => `${n ? `Pops ${n} argument${n === 1 ? "" : "s"} and allocates` : "Allocates"} \`#${node.id} = ${this.show(node.id)} : ${this.sortName(t!.retSort)}\`, pushed on the stack${save ? ` and saved as heap entry ${this.heap.length - 1}` : ""}.`);
+        this.say(rec, () => `${n ? `Pops ${n} argument${n === 1 ? "" : "s"} and allocates node` : "Allocates node"} \`#${node.id} = ${this.show(node.id)} : ${this.sortName(t!.retSort)}\`, pushed on the stack${save ? ` and saved as heap entry ${this.heap.length - 1}` : ""}.`);
         return;
       }
       case 0x12: {
@@ -629,7 +629,7 @@ export class Machine {
         } else {
           this.push(hEntry);
           this.say(rec, () => {
-            return `Pushes heap entry ${data}, ${STACK_KIND_TEXT[hEntry.kind]} \`${this.showEntry(hEntry)}\`, on the stack. The stack entry is a pointer to the interned expression node #${hEntry.e}, not a copy: Refl and unification compare pointers.`;
+            return `Pushes heap entry ${data}, ${STACK_KIND_TEXT[hEntry.kind]} \`${this.showEntry(hEntry)}\`, on the stack.`;
           });
         }
         return;
@@ -650,7 +650,7 @@ export class Machine {
         this.nextBv++;
         this.push({ kind: "expr", e: node.id });
         this.pushHeap({ kind: "expr", e: node.id });
-        this.say(rec, () => `Allocates a new bound variable \`${name} : ${this.sortName(data)}\` (bit ${node.bv} of the deps bitmaps), pushed on the stack and saved as heap entry ${this.heap.length - 1}; next_bv becomes ${this.nextBv}.`);
+        this.say(rec, () => `Allocates a new bound variable node \`#${node.id} = ${name} : ${this.sortName(data)}\` (bit ${node.bv} of the deps bitmaps), pushed on the stack and saved as heap entry ${this.heap.length - 1}; next_bv becomes ${this.nextBv}.`);
         return;
       }
       case 0x14:
@@ -720,7 +720,7 @@ export class Machine {
         const e1 = this.popKind("expr", "e1");
         this.push({ kind: "proof", e: e1.e });
         this.push({ kind: "coconv", e1: e1.e, e2: p.e });
-        this.say(rec, () => `Claims \`|- ${this.show(e1.e)}\` from \`|- ${this.show(p.e)}\`, leaving the obligation \`${this.show(e1.e)} =?= ${this.show(p.e)}\` to discharge.`);
+        this.say(rec, () => `Infers \`|- ${this.show(e1.e)}\` from \`|- ${this.show(p.e)}\`, leaving the obligation \`${this.show(e1.e)} =?= ${this.show(p.e)}\` to discharge.`);
         return;
       }
       case 0x18: {
