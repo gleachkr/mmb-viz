@@ -225,11 +225,28 @@ export function allDecls(L: Layout): DeclSummary[] {
   return out;
 }
 
+/** A statement in three pieces: the head, the hypothesis binders, the conclusion. */
+function statementParts(d: DeclSummary): { head: string; hyps: string[]; concl?: string } {
+  const head = d.category === "def" && d.concl !== undefined ? `${d.signature} = ${d.concl}` : d.signature;
+  const hyps = d.hyps.map((h) => `(${h.name}: $ ${h.text} $)`);
+  // A named hypothesis is a binder, so the conclusion follows the binders after a
+  // colon; `>` separates the anonymous hypotheses of an arrow type, which these
+  // are not.
+  const concl = (d.category === "axiom" || d.category === "theorem") && d.concl !== undefined ? `$ ${d.concl} $` : undefined;
+  return { head, hyps, concl };
+}
+
 /** The full multi-line statement of a declaration, MM0 style. */
 export function showStatement(d: DeclSummary): string {
-  const lines = [d.signature];
-  if (d.category === "def" && d.concl !== undefined) lines[0] += ` = ${d.concl}`;
-  for (const h of d.hyps) lines.push(`  (${h.name}: $ ${h.text} $)`);
-  if ((d.category === "axiom" || d.category === "theorem") && d.concl !== undefined) lines.push(`  ${d.hyps.length ? ">" : ":"} $ ${d.concl} $`);
+  const { head, hyps, concl } = statementParts(d);
+  const lines = [head, ...hyps.map((h) => `  ${h}`)];
+  if (concl !== undefined) lines.push(`  : ${concl}`);
   return lines.join("\n");
+}
+
+/** The same statement on one line, for the folded view. */
+export function showStatementLine(d: DeclSummary): string {
+  const { head, hyps, concl } = statementParts(d);
+  const binders = [head, ...hyps].join(" ");
+  return concl === undefined ? binders : `${binders}: ${concl}`;
 }

@@ -1,6 +1,6 @@
 import { batch, createEffect, createMemo, createRoot, createSignal, For, on, Show } from "solid-js";
 import { hex, hex2, hexOffset } from "../core/bytes";
-import { categoryOf, showStatement, summarize } from "../core/decls";
+import { categoryOf, showStatement, showStatementLine, summarize } from "../core/decls";
 import { picture, ruleSchema, type PictureColumn } from "../core/rules";
 import { declName, type Statement } from "../core/layout";
 import { UNIFY_MODE_TEXT, type Check, type ExprNode, type HeapEntry, type Machine, type StackEntry, type VerifyError } from "../core/machine";
@@ -130,7 +130,7 @@ function Head(props: { v: DebugView }) {
             <button class="dbg-sig-fold" onClick={() => toggleFold("sig")} title={folded().has("sig") ? "show the full statement" : "show only the signature"}>
               <span class="dbg-fold">▾</span>
             </button>
-            <pre class="dbg-sig-text">{folded().has("sig") ? d().signature : showStatement(d())}</pre>
+            <pre class="dbg-sig-text">{folded().has("sig") ? showStatementLine(d()) : showStatement(d())}</pre>
           </div>
         )}
       </Show>
@@ -374,10 +374,14 @@ function NodeRef(props: { id: number; hover?: boolean }) {
 /** Which state panels are folded away, by panel class; remembered across sessions. */
 const [folded, setFolded] = createSignal<ReadonlySet<string>>(readFolded());
 function readFolded(): Set<string> {
+  // The signature starts folded: one line is enough to say which proof this is,
+  // and the space belongs to the machine state.
+  const initial = ["sig"];
   try {
-    return new Set(JSON.parse(localStorage.getItem("mmb-viz.dbg-folded") ?? "[]") as string[]);
+    const stored = localStorage.getItem("mmb-viz.dbg-folded");
+    return new Set(stored === null ? initial : (JSON.parse(stored) as string[]));
   } catch {
-    return new Set();
+    return new Set(initial);
   }
 }
 function toggleFold(key: string): void {

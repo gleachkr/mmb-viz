@@ -99,7 +99,7 @@ describe("declarations", () => {
     expect(stmts).toContain("provable sort wff");
     expect(stmts).toContain("term imp: wff > wff > wff");
     expect(stmts).toContain("local def and (a b: wff): wff = not (imp a (not b))");
-    expect(stmts).toContain("axiom ax_mp (a b: wff)\n  (h1: $ imp a b $)\n  (h2: $ a $)\n  > $ b $");
+    expect(stmts).toContain("axiom ax_mp (a b: wff)\n  (h1: $ imp a b $)\n  (h2: $ a $)\n  : $ b $");
     expect(stmts).toContain("theorem id (a: wff)\n  : $ imp a a $");
   });
 
