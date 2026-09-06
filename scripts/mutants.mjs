@@ -11,9 +11,10 @@
 /** @typedef {{ at: number, expect: number[], put: number[] }} Patch */
 /**
  * @typedef {{ file: string, title: string, description: string, patches: Patch[], truncate?: number,
- *   expectProblems: string[], expectVerify?: { stmt: number, status: "error" | "sorry", message?: string } }} Mutant
+ *   expectProblems: string[], expectVerify?: { stmt: number, status: "error" | "sorry", message?: string, diagnosis?: string } }} Mutant
  * `expectProblems` are layout-level; `expectVerify` is what the stack machine must report
- * (statement index, and for errors a fragment of the failing check's message).
+ * (statement index, for errors a fragment of the failing check's message, and the error
+ * explorer's diagnosis kind).
  */
 
 // a1i's 25-byte proof body, rewritten to cite a1i itself (theorem 6):
@@ -60,6 +61,7 @@ export const MUTANTS = [
     description: "The proof of mpd (theorem 8) cites theorem 9 (syl), which is declared after it. The layout is intact; the reference is illegal.",
     patches: [{ at: 1100, expect: [0x01], put: [0x09] }],
     expectProblems: ["forward reference: theorem 9"],
+    expectVerify: { stmt: 13, status: "error", message: "theorem declared before this statement", diagnosis: "forward-reference" },
   },
   {
     file: "mutant_circular_proof.mmb",
@@ -67,6 +69,7 @@ export const MUTANTS = [
     description: "The proof of a1i (theorem 6) is replaced by one that applies a1i itself. mm0-c rejects the self-reference; Aufbau (as of 2026-09) accepts it.",
     patches: [{ at: 1004, expect: A1I_BODY, put: CIRCULAR_BODY }],
     expectProblems: ["theorem 6 refers to itself"],
+    expectVerify: { stmt: 11, status: "error", message: "a theorem may not cite itself", diagnosis: "self-reference" },
   },
   {
     file: "mutant_unify_arity.mmb",
@@ -74,6 +77,7 @@ export const MUTANTS = [
     description: "The unify stream of def `and` starts with URef instead of UTerm, so the value is complete after one command and the rest of the stream is unexpected.",
     patches: [{ at: 144, expect: [0x70, 0x01], put: [0x72, 0x01] }],
     expectProblems: ["END came too late"],
+    expectVerify: { stmt: 8, status: "error", message: "top of unify stack is unify heap entry", diagnosis: "unify-mismatch" },
   },
   {
     file: "mutant_unknown_opcode.mmb",
@@ -81,6 +85,7 @@ export const MUTANTS = [
     description: "The first command of the proof of `id` is opcode 0x3f, which the spec does not define.",
     patches: [{ at: 897, expect: [0x12], put: [0x3f] }],
     expectProblems: ["unknown opcode 0x3f"],
+    expectVerify: { stmt: 7, status: "error", message: "known proof opcode", diagnosis: "encoding" },
   },
   {
     file: "mutant_sorry.mmb",
@@ -96,7 +101,7 @@ export const MUTANTS = [
     description: "The proof of or_right builds `imp b (or a b)` twice, so the conversion obligation has structurally equal but distinct sides. Refl requires the very same node; Save and Ref are the only way to get that.",
     patches: [{ at: 0x3cc, expect: OR_RIGHT_BODY, put: REFL_BODY }],
     expectProblems: [],
-    expectVerify: { stmt: 10, status: "error", message: "both sides are the same node" },
+    expectVerify: { stmt: 10, status: "error", message: "both sides are the same node", diagnosis: "identity" },
   },
   {
     file: "mutant_wrong_conclusion.mmb",
@@ -104,7 +109,7 @@ export const MUTANTS = [
     description: "The unify stream of mpd now claims the conclusion `imp a b` while the proof establishes `imp a c`. The final unification of the proved statement against the theorem table fails on the last URef. (syl, which applies mpd, then fails too.)",
     patches: [{ at: 0x253, expect: [0x02], put: [0x01] }],
     expectProblems: [],
-    expectVerify: { stmt: 13, status: "error", message: "top of unify stack is unify heap entry" },
+    expectVerify: { stmt: 13, status: "error", message: "top of unify stack is unify heap entry", diagnosis: "unify-mismatch" },
   },
   {
     file: "mutant_bad_stack.mmb",
@@ -112,7 +117,39 @@ export const MUTANTS = [
     description: "In the proof of or_right the Conv command is replaced by Refl, which expects a conversion obligation on top of the stack but finds the proof that Thm just pushed.",
     patches: [{ at: 0x3e2, expect: [0x17], put: [0x18] }],
     expectProblems: [],
-    expectVerify: { stmt: 10, status: "error", message: "expected obligation" },
+    expectVerify: { stmt: 10, status: "error", message: "expected obligation", diagnosis: "wrong-kind" },
+  },
+  {
+    file: "mutant_missing_save.mmb",
+    title: "Fail case: Ref to a heap entry that was never saved",
+    description: "In the proof of `id` the TermSave that creates heap entry 2 is a plain Term, so the next `Ref 2` asks for an entry the heap does not have.",
+    patches: [{ at: 0x386, expect: [0x11], put: [0x10] }],
+    expectProblems: [],
+    expectVerify: { stmt: 7, status: "error", message: "heap index in range", diagnosis: "missing-save" },
+  },
+  {
+    file: "mutant_stack_underflow.mmb",
+    title: "Fail case: stack underflow",
+    description: "In the proof of ax_1 the `Ref 0` that pushes the second argument of the inner `imp` is replaced by Save, so the outer `imp` finds one argument where it needs two.",
+    patches: [{ at: 0x34b, expect: [0x12], put: [0x1f] }],
+    expectProblems: [],
+    expectVerify: { stmt: 3, status: "error", message: "stack has the arguments", diagnosis: "stack-underflow" },
+  },
+  {
+    file: "mutant_stack_leftover.mmb",
+    title: "Fail case: leftover stack elements",
+    description: "In the proof of ax_1 the outer `Term imp` is replaced by Save, so the proof ends with two expressions on the stack instead of one.",
+    patches: [{ at: 0x34d, expect: [0x10], put: [0x1f] }],
+    expectProblems: [],
+    expectVerify: { stmt: 3, status: "error", message: "stack holds exactly one element", diagnosis: "stack-leftover" },
+  },
+  {
+    file: "mutant_wrong_theorem.mmb",
+    title: "Fail case: the wrong theorem applied",
+    description: "The proof of a1i ends by applying theorem 4 (id) where it meant theorem 3 (ax_mp). The arguments fix a substitution under which id's conclusion is not the expression on the stack.",
+    patches: [{ at: 0x402, expect: [0x54, 0x03], put: [0x54, 0x04] }],
+    expectProblems: [],
+    expectVerify: { stmt: 11, status: "error", message: "top of unify stack is unify heap entry", diagnosis: "unify-mismatch" },
   },
   {
     file: "mutant_truncated.mmb",

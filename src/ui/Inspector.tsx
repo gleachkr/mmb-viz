@@ -2,7 +2,7 @@ import { createMemo, For, Show } from "solid-js";
 import { hex, type Cmd } from "../core/bytes";
 import { EXPLAIN, PROOF_OP_EXPLAIN, STMT_EXPLAIN, UNIFY_OP_EXPLAIN, type OpExplanation } from "../core/explain";
 import { family, jumpText, type Problem, type Span, type SpanKind } from "../core/spans";
-import { loaded, selectedChain, goTo, canGoBack, goBack, problems, scan, selectedOwner, inspTab, setInspTab, type InspTab, debugOffset, setCenterTab, verification, openDebugger } from "./state";
+import { loaded, selectedChain, goTo, canGoBack, goBack, problems, scan, selectedOwner, inspTab, setInspTab, type InspTab, debugOffset, setCenterTab, verification, openDebugger, diagnosisFor } from "./state";
 import { describeValue, familyClass, rangeLabel, FAMILY_TITLES } from "./format";
 import { BitView, bitLayoutFor } from "./BitView";
 import { DeclCard } from "./DeclCard";
@@ -337,7 +337,10 @@ function VerificationProblems() {
               const st = () => L()!.statements[r.index]!;
               return (
                 <button class={`problem link-row ${r.status === "error" ? "error" : "warning"}`} onClick={() => openDebugger(st(), Infinity)} title="open in the debugger at the failing step">
-                  <span class="mono">{hex(st().offset)}</span> {st().decl ? declName(L()!, st().decl!) : `statement ${r.index}`}: {r.status === "sorry" ? "uses Sorry" : r.error?.message}
+                  <span class="mono">{hex(st().offset)}</span> {st().decl ? declName(L()!, st().decl!) : `statement ${r.index}`}:{" "}
+                  <Show when={r.status === "error"} fallback="uses Sorry">
+                    <b>{diagnosisFor(st())?.title ?? "fails"}</b> at step {r.error?.step}: {r.error?.message}
+                  </Show>
                 </button>
               );
             }}

@@ -667,7 +667,20 @@ button { font: inherit; color: inherit; }
 .dbg-mnemonic { font-weight: 700; }
 .dbg-summary { margin: 6px 0 8px; }
 .dbg-summary code { font-size: 12px; background: rgba(30, 26, 22, 0.06); padding: 0 3px; border-radius: 2px; }
-.dbg-error { margin: 0 0 8px; }
+.dbg-error { margin: 0 0 10px; padding: 8px 10px; border-left: 3px solid var(--accent); background: var(--accent-soft); }
+.dbg-error p { margin: 4px 0; }
+.dbg-error code, .dbg-likely code { font-size: 12px; background: rgba(30, 26, 22, 0.06); padding: 0 3px; border-radius: 2px; }
+.dbg-error-head { color: var(--accent); }
+.dbg-compare { margin: 6px 0; display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; align-items: baseline; }
+.dbg-compare-label { font-size: 11px; color: var(--ink-2); text-align: right; }
+.dbg-compare-expr { font-family: var(--mono); font-size: 12px; background: rgba(255, 255, 255, 0.7); padding: 2px 5px; }
+.dbg-diff { background: var(--accent); color: #fff; padding: 0 2px; border-radius: 2px; }
+.dbg-compare.same .dbg-diff { background: transparent; color: inherit; }
+.dbg-likely { color: var(--ink-2); }
+.dbg-likely .dbg-key, .dbg-related .dbg-key { width: auto; margin-right: 4px; }
+.dbg-related { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: baseline; margin-top: 4px; font-size: 11px; }
+.dbg-related code { font-size: 11px; }
+button.dbg-status { cursor: pointer; }
 .dbg-key { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); width: 48px; flex: none; }
 .dbg-reads { display: flex; flex-wrap: wrap; gap: 4px; font-size: 11px; }
 .dbg-rule { margin: 6px 0 8px; padding: 6px 8px; background: #fbf8f1; border: 1px solid var(--rule); font-family: var(--mono); font-size: 12px; }

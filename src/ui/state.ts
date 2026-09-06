@@ -5,6 +5,7 @@ import { collectProblems, spanChainAt, type DeclRef, type Problem, type Span } f
 import { disassembleProof } from "../core/streams";
 import { type Machine, type Snapshot, type StepRecord } from "../core/machine";
 import { Trace, verifyStatement, type StatementResult } from "../core/verify";
+import { diagnose, type Diagnosis, type Related } from "../core/diagnose";
 import { declName, type Statement } from "../core/layout";
 
 export interface Loaded {
@@ -342,6 +343,47 @@ export interface DebugView {
   record?: StepRecord;
   /** Index of the record that opened the current unify frame, if any. */
   frameStart: number;
+  /** The error explorer's reading of the failure, for a failing statement. */
+  diagnosis?: Diagnosis;
+}
+
+const diagnoses = new WeakMap<Trace, Diagnosis | undefined>();
+/** The diagnosis of a trace, computed once. Repositions the trace's machine, so call it before `trace.at`. */
+function diagnosisOfTrace(trace: Trace): Diagnosis | undefined {
+  if (trace.result.status !== "error") return undefined;
+  if (!diagnoses.has(trace)) diagnoses.set(trace, diagnose(trace));
+  return diagnoses.get(trace);
+}
+
+const diagnosesByStatement = new WeakMap<Layout, Map<number, Diagnosis | undefined>>();
+/** The diagnosis of a failing statement, tracing it if the debugger has not; undefined when it does not fail. */
+export function diagnosisFor(stmt: Statement): Diagnosis | undefined {
+  const L = loaded()?.layout;
+  if (!L || resultOf(stmt.index)?.status !== "error") return undefined;
+  const cur = debug();
+  if (cur && cur.trace.stmt === stmt && cur.trace.L === L) return diagnosisOfTrace(cur.trace);
+  let map = diagnosesByStatement.get(L);
+  if (!map) diagnosesByStatement.set(L, (map = new Map()));
+  if (!map.has(stmt.index)) map.set(stmt.index, diagnosisOfTrace(new Trace(L, stmt)));
+  return map.get(stmt.index);
+}
+
+/** Follow one of a diagnosis's links: a step of the current trace, a declaration, or bytes in the hexdump. */
+export function goToRelated(r: Related): void {
+  switch (r.kind) {
+    case "step":
+      debugGoto(r.step);
+      break;
+    case "decl":
+      goToDecl(r.ref);
+      break;
+    case "offset":
+      batch(() => {
+        goTo(r.offset);
+        setCenterTab("hex");
+      });
+      break;
+  }
 }
 
 /** The debugger's current state: the machine re-positioned at the chosen step. */
@@ -349,10 +391,11 @@ export const debugView: () => DebugView | undefined = createRoot(() =>
   createMemo(() => {
     const d = debug();
     if (!d) return undefined;
+    const diagnosis = diagnosisOfTrace(d.trace);
     const m = d.trace.at(d.step);
     const snap = m.snapshot();
     const frameStart = snap.unify ? frameOpener(d.trace.records, d.step) : -1;
-    return { trace: d.trace, step: d.step, m, snap, record: d.trace.records[d.step - 1], frameStart };
+    return { trace: d.trace, step: d.step, m, snap, record: d.trace.records[d.step - 1], frameStart, diagnosis };
   }),
 );
 

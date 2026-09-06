@@ -264,6 +264,13 @@ When a statement fails: the failing command, the failed check with its spec
 rule, the state at that moment, and a suggested reading of what the file
 author probably intended (for the common cases: forward reference, sort
 mismatch, missing `Save`, unify mismatch).
+Done (2026-09-06): `src/core/diagnose.ts` classifies the failed check into
+fourteen kinds, renders expected and actual expressions with the first
+differing subterm marked (instantiating the theorem's statement under the
+substitution the arguments fixed), writes the probable intent, and links
+the related step, declaration, or bytes. Four more mutants (missing save,
+stack underflow, leftover stack, wrong theorem) cover the new kinds and
+the mutant test asserts every diagnosis kind.
 
 ### 3.8 Spec companion
 
@@ -368,7 +375,7 @@ linked to the hexdump. Whole-file verification runs on the main thread in
 40 ms slices rather than in a worker (peano takes under a second), and time
 travel uses keyframes every 64 steps plus re-execution.
 
-M3, teaching features: step into unification, narrative panel with
+M3, teaching features (done 2026-09-06): step into unification, narrative panel with
 instantiated spec rules, expression identity and V/FV display, error
 explorer, statement list with run-all status. Breakpoints were dropped.
 

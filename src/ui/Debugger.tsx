@@ -3,11 +3,12 @@ import { hex, hex2, hexOffset } from "../core/bytes";
 import { categoryOf, showStatement, summarize } from "../core/decls";
 import { picture, ruleSchema, type PictureColumn } from "../core/rules";
 import { declName, type Statement } from "../core/layout";
-import { UNIFY_MODE_TEXT, type Check, type ExprNode, type HeapEntry, type Machine, type StackEntry } from "../core/machine";
+import { UNIFY_MODE_TEXT, type Check, type ExprNode, type HeapEntry, type Machine, type StackEntry, type VerifyError } from "../core/machine";
+import { type Segment } from "../core/diagnose";
 import { childrenOf, type Span } from "../core/spans";
 import { CATEGORY_CLASS } from "./DeclCard";
 import { familyClass } from "./format";
-import { debugGoto, debugStep, debugStepBackOver, debugStepOver, debugView, stepBackOverTarget, stepOverTarget, goTo, loaded, openDebugger, reveal, setCenterTab, type DebugView } from "./state";
+import { debugGoto, debugStep, debugStepBackOver, debugStepOver, debugView, stepBackOverTarget, stepOverTarget, goTo, goToRelated, loaded, openDebugger, reveal, setCenterTab, type DebugView } from "./state";
 
 const KIND_MARK: Record<StackEntry["kind"], string> = { expr: "", proof: "|-", conv: "=", coconv: "=?=" };
 
@@ -106,9 +107,14 @@ function Head(props: { v: DebugView }) {
         <span class="muted mono">
           statement {st().index} · {hex(st().offset)} · {n()} steps
         </span>
-        <span class={`dbg-status ${result().status}`} title={result().error?.message}>
-          {result().status === "ok" ? "verifies" : result().status === "sorry" ? "uses Sorry" : "fails"}
-        </span>
+        <Show
+          when={result().status === "error"}
+          fallback={<span class={`dbg-status ${result().status}`}>{result().status === "ok" ? "verifies" : "uses Sorry"}</span>}
+        >
+          <button class="dbg-status error" onClick={() => debugGoto(n())} title={`${props.v.diagnosis?.title ?? "fails"}: ${result().error?.message ?? ""}. Click to go to the failing step.`}>
+            fails at step {n()}{props.v.diagnosis ? `: ${props.v.diagnosis.title.toLowerCase()}` : ""}
+          </button>
+        </Show>
         <span class="dbg-nav">
           <button class="link small" disabled={!neighbor(-1)} onClick={() => neighbor(-1) && openDebugger(neighbor(-1)!)}>
             ‹ previous proof
@@ -680,16 +686,12 @@ function Narrative(props: { v: DebugView }) {
               <span class="dbg-mnemonic mono">{rec().mnemonic}</span>
               <span class="dbg-step-at mono muted">{hex(rec().span.start)}</span>
             </div>
-            <p class="dbg-summary">
-              <Prose text={rec().summary} />
-            </p>
-            <Show when={rec().error}>
-              {(err) => (
-                <div class="problem error dbg-error">
-                  <b>Verification fails here.</b> <NodeText text={err().message} />
-                </div>
-              )}
+            <Show when={!(rec().error && props.v.diagnosis)}>
+              <p class="dbg-summary">
+                <Prose text={rec().summary} />
+              </p>
             </Show>
+            <Show when={rec().error}>{(err) => <Failure v={props.v} err={err()} />}</Show>
             <Show when={ruleSchema(rec())}>
               {(sch) => (
                 <div class="dbg-rule">
@@ -796,6 +798,77 @@ function PictureSide(props: { m: Machine; cols: PictureColumn[]; opensAt?: numbe
       </For>
     </span>
   );
+}
+
+/**
+ * The error explorer: what kind of mistake the failing check points to, the
+ * expected and actual expressions side by side when there are two, the
+ * probable intent, and links to the other places involved.
+ */
+function Failure(props: { v: DebugView; err: VerifyError }) {
+  const d = () => props.v.diagnosis;
+  return (
+    <div class="dbg-error">
+      <div class="dbg-error-head">
+        ✗ Verification fails here{d() ? ": " : "."}
+        <Show when={d()}>{(dg) => <b>{dg().title}.</b>}</Show>
+      </div>
+      <Show
+        when={d()}
+        fallback={
+          <p>
+            <NodeText text={props.err.message} />
+          </p>
+        }
+      >
+        {(dg) => (
+          <>
+            <For each={dg().what}>
+              {(p) => (
+                <p>
+                  <Prose text={p} />
+                </p>
+              )}
+            </For>
+            <Show when={dg().compare}>
+              {(c) => (
+                <div class="dbg-compare" classList={{ same: c().same }}>
+                  <span class="dbg-compare-label">{c().expectedLabel}</span>
+                  <code class="dbg-compare-expr">
+                    <Segments segs={c().expected} />
+                  </code>
+                  <span class="dbg-compare-label">{c().actualLabel}</span>
+                  <code class="dbg-compare-expr">
+                    <Segments segs={c().actual} />
+                  </code>
+                </div>
+              )}
+            </Show>
+            <p class="dbg-likely">
+              <span class="dbg-key">reading</span> <Prose text={dg().likely} />
+            </p>
+            <Show when={dg().related.length}>
+              <div class="dbg-related">
+                <span class="dbg-key">see</span>
+                <For each={dg().related}>
+                  {(r) => (
+                    <button class="crumb link" onClick={() => goToRelated(r)}>
+                      <Prose text={r.label} />
+                    </button>
+                  )}
+                </For>
+              </div>
+            </Show>
+          </>
+        )}
+      </Show>
+    </div>
+  );
+}
+
+/** An expression with the differing subterm marked. */
+function Segments(props: { segs: Segment[] }) {
+  return <For each={props.segs}>{(s) => (s.mark ? <mark class="dbg-diff">{s.text}</mark> : s.text)}</For>;
 }
 
 /** Text with `backticked` runs rendered as code: the machine writes expressions that way in its summaries. */

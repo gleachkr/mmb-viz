@@ -70,6 +70,26 @@
     "description": "In the proof of or_right the Conv command is replaced by Refl, which expects a conversion obligation on top of the stack but finds the proof that Thm just pushed."
   },
   {
+    "file": "mutant_missing_save.mmb",
+    "title": "Fail case: Ref to a heap entry that was never saved",
+    "description": "In the proof of `id` the TermSave that creates heap entry 2 is a plain Term, so the next `Ref 2` asks for an entry the heap does not have."
+  },
+  {
+    "file": "mutant_stack_underflow.mmb",
+    "title": "Fail case: stack underflow",
+    "description": "In the proof of ax_1 the `Ref 0` that pushes the second argument of the inner `imp` is replaced by Save, so the outer `imp` finds one argument where it needs two."
+  },
+  {
+    "file": "mutant_stack_leftover.mmb",
+    "title": "Fail case: leftover stack elements",
+    "description": "In the proof of ax_1 the outer `Term imp` is replaced by Save, so the proof ends with two expressions on the stack instead of one."
+  },
+  {
+    "file": "mutant_wrong_theorem.mmb",
+    "title": "Fail case: the wrong theorem applied",
+    "description": "The proof of a1i ends by applying theorem 4 (id) where it meant theorem 3 (ax_mp). The arguments fix a substitution under which id's conclusion is not the expression on the stack."
+  },
+  {
     "file": "mutant_truncated.mmb",
     "title": "Fail case: truncated file",
     "description": "The tutorial file cut off in the middle of the proof stream: the index pointer and several statements run past the end."

@@ -81,6 +81,8 @@ export interface UnifyFrame {
   pc: number;
   ustack: number[];
   uheap: { e: number; saved: boolean }[];
+  /** The expressions this frame has started matching, in order: the target, then one per UHyp. */
+  roots: number[];
   /** What happens when the stream's END is reached. */
   onEnd: { kind: "thm"; e: number; save: boolean } | { kind: "unfold"; e: number; e2: number } | { kind: "finish" };
 }
@@ -241,7 +243,7 @@ export class Machine {
       nextBv: this.nextBv,
       dummies: this.dummies,
       sorryUsed: this.sorryUsed,
-      unify: u ? { ...u, ustack: u.ustack.slice(), uheap: u.uheap.slice() } : undefined,
+      unify: u ? { ...u, ustack: u.ustack.slice(), uheap: u.uheap.slice(), roots: u.roots.slice() } : undefined,
       arenaLen: this.arenaLen,
       stepCount: this.stepCount,
     };
@@ -256,7 +258,7 @@ export class Machine {
     this.nextBv = s.nextBv;
     this.dummies = s.dummies;
     this.sorryUsed = s.sorryUsed;
-    this.unify = s.unify ? { ...s.unify, ustack: s.unify.ustack.slice(), uheap: s.unify.uheap.slice() } : undefined;
+    this.unify = s.unify ? { ...s.unify, ustack: s.unify.ustack.slice(), uheap: s.unify.uheap.slice(), roots: s.unify.roots.slice() } : undefined;
     this.arenaLen = s.arenaLen;
     this.bvNames.length = 0;
     for (let i = 0; i < this.arenaLen; i++) {
@@ -855,7 +857,7 @@ export class Machine {
   private openUnify(rec: StepRecord, mode: UnifyMode, owner: DeclRef, stream: Span, uheap: { e: number; saved: boolean }[], target: number, onEnd: UnifyFrame["onEnd"]): void {
     this.read(stream);
     const cmds = childrenOf(stream);
-    this.unify = { mode, owner, stream, cmds, pc: 0, ustack: [target], uheap, onEnd };
+    this.unify = { mode, owner, stream, cmds, pc: 0, ustack: [target], uheap, roots: [target], onEnd };
     rec.opens = mode;
     rec.upushes.push(target);
     rec.uheapPushes.push(...uheap.map((u) => u.e));
@@ -948,6 +950,7 @@ export class Machine {
         this.check("UHyp only in theorem statements", "Unification", !isDef, `this unify stream is being run while ${UNIFY_MODE_TEXT[u.mode]}`);
         if (u.mode === "thm") {
           const p = this.popKind("proof", "|- e (a hypothesis of the theorem being applied)");
+          u.roots.push(p.e);
           this.upush(p.e);
           this.say(rec, () => `Pops the proof \`|- ${this.show(p.e)}\` from the main stack; the following unify commands must match it against the hypothesis.`);
         } else {
@@ -955,6 +958,7 @@ export class Machine {
           this.check("the proof declared a hypothesis for this UHyp", "Unification", this.hyps.length > 0, "the proof's hypothesis list is empty, but the unify stream declares another hypothesis");
           const e = this.hyps.pop()!;
           rec.hypPopped = e;
+          u.roots.push(e);
           this.upush(e);
           this.say(rec, () => `Takes the last hypothesis the proof declared, \`${this.show(e)}\`; the following unify commands must match it.`);
         }

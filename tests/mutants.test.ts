@@ -4,7 +4,8 @@ import { join } from "node:path";
 import { parseLayout } from "../src/core/layout";
 import { checkPartition, collectProblems, leaves } from "../src/core/spans";
 import { MUTANTS, applyMutant } from "../scripts/mutants.mjs";
-import { verifyFile } from "../src/core/verify";
+import { Trace, verifyFile } from "../src/core/verify";
+import { diagnose } from "../src/core/diagnose";
 
 const EXAMPLES = join(__dirname, "..", "public", "examples");
 const base = new Uint8Array(readFileSync(join(EXAMPLES, "tutorial.mmb")));
@@ -30,6 +31,13 @@ describe("mutated files", () => {
         const bad = r.results.find((x) => x.status !== "ok");
         expect(bad && `${bad.index}:${bad.status}`).toBe(`${m.expectVerify.stmt}:${m.expectVerify.status}`);
         if (m.expectVerify.message) expect(bad!.error?.message).toContain(m.expectVerify.message);
+        if (m.expectVerify.diagnosis) {
+          // The error explorer must read the failure as the kind of mistake the mutant introduced.
+          const d = diagnose(new Trace(L, L.statements[bad!.index]!));
+          expect(d?.kind).toBe(m.expectVerify.diagnosis);
+          expect(d!.what.length).toBeGreaterThan(0);
+          expect(d!.likely.length).toBeGreaterThan(0);
+        }
       }
     });
   }
