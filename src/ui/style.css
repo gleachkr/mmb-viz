@@ -588,13 +588,19 @@ button { font: inherit; color: inherit; }
 .dbg-slider { flex: 1; min-width: 120px; accent-color: var(--ink); }
 
 .dbg-body { display: grid; grid-template-columns: minmax(300px, 5fr) minmax(280px, 4fr); gap: 0; min-height: 0; flex: none; border-bottom: 1px solid var(--rule); }
-.dbg-streams { min-width: 0; border-right: 1px solid var(--rule); display: flex; flex-direction: column; }
+/* The streams column fills the row the state column sets (contain: size keeps
+   its own content out of the row height), never less than min-height; the
+   rows boxes scroll within it. */
+.dbg-streams { min-width: 0; border-right: 1px solid var(--rule); display: flex; flex-direction: column; contain: size; min-height: 440px; }
 .dbg-state { min-width: 0; padding: 6px 12px 10px; display: flex; flex-direction: column; gap: 8px; }
 
-.dbg-stream { font-family: var(--mono); font-size: 11.5px; }
-.dbg-stream-title { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-2); padding: 8px 12px 4px; border-bottom: 1px solid var(--rule); position: sticky; top: 0; background: var(--paper); }
+.dbg-stream { font-family: var(--mono); font-size: 11.5px; display: flex; flex-direction: column; min-height: 0; }
+/* A unify sub-problem keeps its natural height (up to half the column) and the proof stream takes the rest. */
+.dbg-stream.proof { flex: 1 1 auto; }
+.dbg-stream.unify { flex: 0 0 auto; max-height: 50%; }
+.dbg-stream-title { flex: none; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-2); padding: 8px 12px 4px; border-bottom: 1px solid var(--rule); position: sticky; top: 0; background: var(--paper); }
 .dbg-stream.unify .dbg-stream-title { background: var(--unify-t); }
-.dbg-rows { max-height: 320px; overflow: auto; scrollbar-width: none; position: relative; }
+.dbg-rows { flex: 1 1 auto; min-height: 0; overflow: auto; scrollbar-width: none; position: relative; }
 .dbg-rows::-webkit-scrollbar { display: none; }
 .dbg-row { display: flex; align-items: baseline; gap: 8px; padding: 1px 8px 1px 6px; cursor: pointer; white-space: nowrap; overflow: hidden; color: var(--ink-3); }
 .dbg-row:hover { background: var(--paper-2); }
