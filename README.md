@@ -104,8 +104,8 @@ between the hexdump and the debugger; `1`–`4` pick the inspector tab;
 Alt+Left goes back after a jump (so does the browser's back button). In the debugger: `.` step, `,` back, `>`
 step over a unification, `<` back over one, `r` restart, `e` run to the end.
 
-Next (M4): what-if editing, statistics, dark mode, an accessibility pass,
-and a GitHub Pages deploy.
+Next (M4): what-if editing, statistics, dark mode, and an accessibility
+pass.
 
 ## Develop
 
@@ -119,6 +119,16 @@ npm run build      # static site in dist/
 
 The corpus tests also walk `~/Projects/mm0/tests` when that checkout exists;
 without it they still run over the bundled examples.
+
+## Deploy
+
+`.github/workflows/pages.yml` typechecks, tests, builds, and publishes `dist/`
+to GitHub Pages on every push to `main` (and on demand from the Actions tab).
+It needs one setting on the repository: Settings → Pages → Build and deployment
+→ Source: **GitHub Actions**. Nothing else is configured for the URL: the Vite
+base is relative and the bundled examples are fetched against
+`document.baseURI`, so the same `dist/` works at a user page, a project page's
+`/<repo>/` subpath, or opened from a local server.
 
 ## Layout
 

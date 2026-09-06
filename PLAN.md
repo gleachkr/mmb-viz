@@ -379,9 +379,12 @@ M3, teaching features (done 2026-09-06): step into unification, narrative panel 
 instantiated spec rules, expression identity and V/FV display, error
 explorer, statement list with run-all status. Breakpoints were dropped.
 
-M4, polish and publish: shareable URLs, what-if editing, statistics,
-keyboard shortcuts, dark mode, accessibility pass, GitHub Pages deploy,
-README.
+M4, polish and publish: shareable URLs (done), keyboard shortcuts (done),
+GitHub Pages deploy (done 2026-09-06: `.github/workflows/pages.yml` typechecks,
+tests, builds and publishes `dist/` on every push to main; the Vite base is
+relative and the examples are fetched against `document.baseURI`, so the site
+works from a project page's subpath), then what-if editing, statistics, dark
+mode, accessibility pass, README.
 
 ---
 

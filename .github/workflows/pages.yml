@@ -1,0 +1,53 @@
+# Build the static site and publish it to GitHub Pages.
+#
+# Enable this once in the repository settings: Settings -> Pages -> Build and
+# deployment -> Source: GitHub Actions. The site is entirely static, and Vite
+# is configured with a relative base (`base: "./"` in vite.config.ts), so it
+# works from a project page's /<repo>/ path without further configuration.
+name: Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Let a run finish rather than cancelling it: a half-deployed site is worse
+# than a stale one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: lts/*
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      # The oracle suite skips itself when mm0-c is not available, which it
+      # is not here; the rest of the tests run against the bundled corpus.
+      - run: npm test
+      - run: npm run build
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
